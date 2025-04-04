@@ -8,12 +8,12 @@ from .query import get_list_jenis, get_list_karyawan, add_jenis, add_karyawan, u
 karyawan_bp = Blueprint('api', __name__)
 
 '''<--- Table Jenis Karyawan --->'''
-@karyawan_bp.route('/api/jenis', methods=['GET'])
+@karyawan_bp.route('/jenis', methods=['GET'])
 def list_jenis():
     jenis_list = get_list_jenis()  # Memanggil fungsi yang sudah dioptimalkan
     return {'jenis_karyawan': jenis_list}, 200  # Mengembalikan hasil dalam format JSON
 
-@karyawan_bp.route('/api/jenis', methods=['POST'])
+@karyawan_bp.route('/jenis', methods=['POST'])
 def tambah_jenis():
     jenis = request.json.get("jenis", None)
 
@@ -30,7 +30,7 @@ def tambah_jenis():
 
 
 '''<--- Table Karyawan --->'''
-@karyawan_bp.route('/api/karyawan', methods=['GET'])
+@karyawan_bp.route('/karyawan', methods=['GET'])
 @jwt_required()
 def list_karyawan():
     karyawan_list = get_list_karyawan()  # Tidak perlu memanggil fetchall()
@@ -38,7 +38,7 @@ def list_karyawan():
     # Karyawan_list sudah dalam format dictionary, jadi tidak perlu diubah lagi
     return {'karyawan': karyawan_list}, 200
 
-@karyawan_bp.route('/api/karyawan', methods=['POST'])
+@karyawan_bp.route('/karyawan', methods=['POST'])
 def tambah_karyawan():
     data = request.json
     jenis = data.get('jenis')
@@ -57,7 +57,7 @@ def tambah_karyawan():
 
     return {'status': "Employee added successfully", 'nama': nama}, 201
 
-@karyawan_bp.route('/api/karyawan/<int:id>', methods=['PUT'])
+@karyawan_bp.route('/karyawan/<int:id>', methods=['PUT'])
 def edit_karyawan(id):
     # Mencari karyawan berdasarkan ID
     karyawan = get_karyawan(id)
@@ -92,7 +92,7 @@ def edit_karyawan(id):
 
     return {'status': "Success update data"}, 200  # Mengembalikan 200 jika berhasil
 
-@karyawan_bp.route('/api/karyawan/delete/<int:id>', methods=['PUT'])
+@karyawan_bp.route('/karyawan/delete/<int:id>', methods=['PUT'])
 def delete_karyawan(id):
     # Mencari karyawan berdasarkan ID
     karyawan = get_karyawan(id)

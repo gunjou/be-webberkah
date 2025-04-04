@@ -3,6 +3,9 @@
 
 ### Custom Ignore ###
 foto_pegawai/
+venv_webhook/
+deploy.sh
+webhook.py
 
 ### Flask ###
 instance/*

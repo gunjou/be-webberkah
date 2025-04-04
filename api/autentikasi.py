@@ -8,7 +8,7 @@ from .query import get_login
 autentikasi_bp = Blueprint('api', __name__)
 
 
-@autentikasi_bp.route('/api/login', methods=['POST'])
+@autentikasi_bp.route('/login', methods=['POST'])
 def login():
     auth = request.get_json()
     username = auth.get('username')
@@ -28,7 +28,7 @@ def login():
         logging.error(f"Database error: {str(e)}")
         return {'status': "Internal server error"}, 500  # Internal Server Error
 
-@autentikasi_bp.route('/api/logout', methods=['POST'])
+@autentikasi_bp.route('/logout', methods=['POST'])
 @jwt_required()  # Ensure the user is authenticated
 def logout():
     # In a simple implementation, you can just return a success message

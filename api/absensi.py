@@ -18,7 +18,7 @@ def hitung_selisih_waktu(jam_masuk, jam_keluar):
     
     return f"{jam} jam {menit} menit"
 
-@absensi_bp.route('/api/absensi', methods=['GET'])
+@absensi_bp.route('/absensi', methods=['GET'])
 @jwt_required()
 def absensi():
     list_absensi = get_list_absensi()
@@ -37,7 +37,7 @@ def absensi():
     
     return {'absensi': result}, 200  # Mengembalikan hasil dalam format JSON
     
-@absensi_bp.route('/api/wajah/<int:id_karyawan>', methods=['POST'])
+@absensi_bp.route('/wajah/<int:id_karyawan>', methods=['POST'])
 def check_wajah(id_karyawan):
     # Periksa apakah file gambar ada dalam request
     # if 'file' not in request.files:
@@ -62,7 +62,7 @@ def check_wajah(id_karyawan):
     else:
         return jsonify({'status': 'wajah tidak cocok'}), 403
     
-@absensi_bp.route('/api/absensi/<int:id_karyawan>', methods=['POST'])
+@absensi_bp.route('/absensi/<int:id_karyawan>', methods=['POST'])
 @jwt_required()
 def check_in(id_karyawan):
     # Periksa apakah file gambar ada dalam request
@@ -91,7 +91,7 @@ def check_in(id_karyawan):
     else:
         return jsonify({'status': 'Face not match'}), 403
     
-@absensi_bp.route('/api/absensi/<int:id_karyawan>', methods=['PUT'])
+@absensi_bp.route('/absensi/<int:id_karyawan>', methods=['PUT'])
 @jwt_required()
 def check_out(id_karyawan):
     # Periksa apakah file gambar ada dalam request
