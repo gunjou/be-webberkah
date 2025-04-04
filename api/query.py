@@ -1,3 +1,5 @@
+from datetime import datetime
+from flask_jwt_extended import create_access_token
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -194,21 +196,94 @@ def remove_karyawan(id_emp):
 
 '''<--- Query untuk Table Absensi --->'''
 def get_list_absensi():
-    result = connection.execute(
-        text(f"""SELECT a.id_absensi, a.id_karyawan, k.nama, k.id_jenis, j.jenis, k.nama, a.tanggal, a.jam_masuk, a.jam_keluar FROM Absensi a INNER JOIN Karyawan k ON k.id_karyawan = a.id_karyawan INNER JOIN Jeniskaryawan j ON k.id_jenis = j.id_jenis WHERE a.status = 1;""")
-    )
-    return result
+    today = datetime.now().date()  # Mendapatkan tanggal hari ini
+    try:
+        result = connection.execute(
+            text("""
+                SELECT a.id_absensi, a.id_karyawan, k.nama, k.id_jenis, j.jenis, a.tanggal, a.jam_masuk, a.jam_keluar 
+                FROM Absensi a 
+                INNER JOIN Karyawan k ON k.id_karyawan = a.id_karyawan 
+                INNER JOIN Jeniskaryawan j ON k.id_jenis = j.id_jenis 
+                WHERE a.status = 1 AND a.tanggal = :today
+            """),
+            {"today": today}  # Menggunakan parameter binding untuk mencegah SQL injection
+        )
+        
+        # Mengonversi hasil menjadi daftar dictionary
+        absensi_list = [dict(row) for row in result.mappings()]  # Mengonversi hasil ke dalam format dictionary
+        return absensi_list
+    except SQLAlchemyError as e:
+        print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
+        return []  # Mengembalikan daftar kosong jika terjadi kesalahan
 
 def add_checkin(id_karyawan, tanggal, jam_masuk):
-    result = connection.execute(
-        text(f"""INSERT INTO Absensi (id_karyawan, tanggal, jam_masuk, jam_keluar, status) VALUES('{id_karyawan}', '{tanggal}', '{jam_masuk}', '{jam_masuk}', 1);""")
-    )
-    connection.commit()
-    return result
+    try:
+        result = connection.execute(
+            text("""INSERT INTO Absensi (id_karyawan, tanggal, jam_masuk, jam_keluar, status) 
+                     VALUES (:id_karyawan, :tanggal, :jam_masuk, NULL, 1)"""),
+            {
+                "id_karyawan": id_karyawan,
+                "tanggal": tanggal,
+                "jam_masuk": jam_masuk
+            }
+        )
+        
+        # Commit perubahan
+        connection.commit()
+        
+        return result.lastrowid  # Mengembalikan ID dari baris yang baru ditambahkan
+    except SQLAlchemyError as e:
+        connection.rollback()  # Rollback jika terjadi kesalahan
+        print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
+        return None  # Mengembalikan None jika terjadi kesalahan
 
-def add_checkout(id_karyawan, tanggal, jam_keluar):
-    result = connection.execute(
-        text(f"""UPDATE Absensi SET jam_keluar = '{jam_keluar}', updated_at = CURRENT_TIMESTAMP WHERE id_karyawan = {id_karyawan} AND tanggal = '{tanggal}';""")
-    )
-    connection.commit()
-    return result
+def update_checkout(id_karyawan, tanggal, jam_keluar):
+    try:
+        result = connection.execute(
+            text("""UPDATE Absensi 
+                     SET jam_keluar = :jam_keluar 
+                     WHERE id_karyawan = :id_karyawan AND tanggal = :tanggal AND jam_keluar IS NULL"""),
+            {
+                "jam_keluar": jam_keluar,
+                "id_karyawan": id_karyawan,
+                "tanggal": tanggal
+            }
+        )
+        
+        # Commit perubahan
+        connection.commit()
+        
+        # Mengembalikan jumlah baris yang terpengaruh
+        return result.rowcount  # Mengembalikan jumlah baris yang diupdate
+    except SQLAlchemyError as e:
+        connection.rollback()  # Rollback jika terjadi kesalahan
+        print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
+        return None  # Mengembalikan None jika terjadi kesalahan
+    
+
+'''<--- Query untuk Login --->'''
+def get_login(username, password):
+    try:
+        # Menggunakan query untuk memverifikasi username dan password
+        result = connection.execute(
+            text("""
+                SELECT id_karyawan, username, password 
+                FROM Karyawan 
+                WHERE username = :username
+                AND password = :password
+            """),
+            {
+                "username": username,
+                "password": password
+            }
+        ).mappings().fetchone()
+
+        if not result:
+            return None
+            
+        access_token = create_access_token(identity=str(result['id_karyawan']))
+        return {'access_token': access_token, "message": "login success"}, 200
+    except SQLAlchemyError as e:
+        print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
+        return {'msg': 'Internal server error'}, 500
+    

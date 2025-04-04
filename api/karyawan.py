@@ -1,4 +1,5 @@
 from flask import Blueprint, request
+from flask_jwt_extended import jwt_required
 from sqlalchemy.exc import SQLAlchemyError
 
 from .query import get_list_jenis, get_list_karyawan, add_jenis, add_karyawan, update_karyawan, remove_karyawan, get_karyawan
@@ -30,6 +31,7 @@ def tambah_jenis():
 
 '''<--- Table Karyawan --->'''
 @karyawan_bp.route('/api/karyawan', methods=['GET'])
+@jwt_required()
 def list_karyawan():
     karyawan_list = get_list_karyawan()  # Tidak perlu memanggil fetchall()
     

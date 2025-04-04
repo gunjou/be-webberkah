@@ -3,7 +3,8 @@ import face_recognition
 
 def verifikasi_wajah(id_karyawan, image):
     # get file and filename
-    file_path = f"./{id_karyawan}.png"
+    file_path = f"./cropped_faces/{id_karyawan}.jpg"
+    # file_path = f"./foto_pegawai/{id_karyawan}.jpg"
     # file_name = os.path.splitext(os.path.basename(file_path))[0]
 
     # Load image

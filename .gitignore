@@ -1,6 +1,9 @@
 # Created by https://www.toptal.com/developers/gitignore/api/virtualenv,python,flask
 # Edit at https://www.toptal.com/developers/gitignore?templates=virtualenv,python,flask
 
+### Custom Ignore ###
+foto_pegawai/
+
 ### Flask ###
 instance/*
 !instance/.gitignore
