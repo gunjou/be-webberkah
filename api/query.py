@@ -3,7 +3,7 @@ from flask_jwt_extended import create_access_token
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from .config import get_connection
+from .config import get_connection, get_timezone
 
 
 connection = get_connection().connect()
@@ -196,7 +196,7 @@ def remove_karyawan(id_emp):
 
 '''<--- Query untuk Table Absensi --->'''
 def get_list_absensi():
-    today = datetime.now().date()  # Mendapatkan tanggal hari ini
+    today, _ = get_timezone()  # Mendapatkan tanggal hari ini
     try:
         result = connection.execute(
             text("""

@@ -2,8 +2,10 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required
 
+from .config import get_timezone
 from .query import get_list_absensi, add_checkin, update_checkout
 from .face_detection import verifikasi_wajah
+from .filter_radius import OFFICE_LOCATIONS, RADIUS_ALLOWED, calculate_distance
 
 
 absensi_bp = Blueprint('api', __name__)
@@ -68,6 +70,31 @@ def check_in(id_karyawan):
     # Periksa apakah file gambar ada dalam request
     if 'file' not in request.files:
         return jsonify({'error': 'No file part in the request'}), 400
+    
+    # Periksa apakah koordinat lokasi ada dalam request
+    user_lat = request.form.get('latitude')  # Ambil dari form-data
+    user_lon = request.form.get('longitude')  # Ambil dari form-data
+
+    if not user_lat or not user_lon:
+        return jsonify({'error': 'Location data is required'}), 400
+
+    # Konversi latitude dan longitude ke float
+    try:
+        user_lat = float(user_lat)
+        user_lon = float(user_lon)
+    except ValueError:
+        return jsonify({'error': 'Invalid latitude or longitude'}), 400
+
+    # Cek apakah user dalam radius lokasi yang diizinkan
+    lokasi_absensi = None
+    for office in OFFICE_LOCATIONS:
+        distance = calculate_distance(office["lat"], office["lon"], user_lat, user_lon)
+        if distance <= RADIUS_ALLOWED:
+            lokasi_absensi = office["name"]
+            break  # Hentikan loop jika sudah menemukan lokasi yang valid
+
+    if lokasi_absensi is None:
+        return jsonify({'status': 'error', 'message': 'You are outside the attendance area'}), 403
 
     # Upload file
     image = request.files['file']
@@ -79,15 +106,14 @@ def check_in(id_karyawan):
     # Verifikasi wajah
     face = verifikasi_wajah(id_karyawan, image)
     if face:
-        tanggal = datetime.now().date()
-        jam_masuk = datetime.now().time()
+        tanggal, jam_masuk = get_timezone()
         
         # Menambahkan check-in
         result = add_checkin(id_karyawan, tanggal, jam_masuk)
         if result is None:
             return jsonify({'status': 'Failed to record check-in'}), 500
         
-        return jsonify({'status': 'Check-in succeeded'}), 200
+        return jsonify({'status': 'Check-in succeeded', 'lokasi': lokasi_absensi}), 200
     else:
         return jsonify({'status': 'Face not match'}), 403
     
@@ -98,6 +124,32 @@ def check_out(id_karyawan):
     if 'file' not in request.files:
         return jsonify({'error': 'No file part in the request'}), 400
 
+    # Ambil latitude dan longitude dari form-data
+    user_lat = request.form.get('latitude')
+    user_lon = request.form.get('longitude')
+    -8.640498963960535, 116.09404163169187
+
+    if not user_lat or not user_lon:
+        return jsonify({'error': 'Location data is required'}), 400
+
+    # Konversi koordinat ke float
+    try:
+        user_lat = float(user_lat)
+        user_lon = float(user_lon)
+    except ValueError:
+        return jsonify({'error': 'Invalid latitude or longitude'}), 400
+
+    # Cek apakah user dalam radius lokasi yang diizinkan
+    lokasi_absensi = None
+    for office in OFFICE_LOCATIONS:
+        distance = calculate_distance(office["lat"], office["lon"], user_lat, user_lon)
+        if distance <= RADIUS_ALLOWED:
+            lokasi_absensi = office["name"]
+            break
+
+    if lokasi_absensi is None:
+        return jsonify({'status': 'error', 'message': 'You are outside the attendance area'}), 403
+
     # Upload file
     image = request.files['file']
 
@@ -108,14 +160,13 @@ def check_out(id_karyawan):
     # Verifikasi wajah
     face = verifikasi_wajah(id_karyawan, image)
     if face:
-        tanggal = datetime.now().date()
-        jam_keluar = datetime.now().time()
+        tanggal, jam_keluar = get_timezone()
         
         # Update jam keluar
         result = update_checkout(id_karyawan, tanggal, jam_keluar)
         if result is None or result == 0:
             return jsonify({'status': 'Failed to record check-out or no check-in found'}), 500
         
-        return jsonify({'status': 'Check-out succeeded'}), 200
+        return jsonify({'status': 'Check-out succeeded', 'lokasi': lokasi_absensi}), 200
     else:
         return jsonify({'status': 'Face not match'}), 403

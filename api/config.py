@@ -1,3 +1,5 @@
+from datetime import datetime
+import pytz
 from sqlalchemy import create_engine
 
 
@@ -8,3 +10,13 @@ def get_connection():
     username = 'berkah'
     password = 'berkah'
     return create_engine(f'postgresql+psycopg2://{username}:{password}@{server}/{database}')
+
+def get_timezone():
+    wita = pytz.timezone("Asia/Makassar")
+    now = datetime.now(wita)
+
+    tanggal_now = now.date()
+    jam_now = now.time()
+
+    return tanggal_now, jam_now
+
