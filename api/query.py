@@ -267,10 +267,12 @@ def get_login(username, password):
         # Menggunakan query untuk memverifikasi username dan password
         result = connection.execute(
             text("""
-                SELECT id_karyawan, username, password 
-                FROM Karyawan 
+                SELECT k.id_karyawan, k.username, k.password, j.jenis, k.nama, k.status
+                FROM Karyawan k INNER JOIN jeniskaryawan j
+                ON k.id_jenis = j.id_jenis
                 WHERE username = :username
                 AND password = :password
+                AND k.status = 1;
             """),
             {
                 "username": username,
@@ -282,7 +284,12 @@ def get_login(username, password):
             return None
             
         access_token = create_access_token(identity=str(result['id_karyawan']))
-        return {'access_token': access_token, "message": "login success"}, 200
+        return {
+            'access_token': access_token,
+            'message': 'login success',
+            'id_karyawan': result['id_karyawan'],
+            'jenis': result['jenis'],
+            'nama': result['nama']}
     except SQLAlchemyError as e:
         print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
         return {'msg': 'Internal server error'}, 500

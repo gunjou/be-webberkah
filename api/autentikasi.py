@@ -23,7 +23,7 @@ def login():
         if get_jwt_response is None:
             return {'status': "Invalid username or password"}, 401  # Unauthorized
 
-        return {'status': "Success", 'jwt': get_jwt_response}, 200  # OK
+        return get_jwt_response, 200  # OK
     except SQLAlchemyError as e:
         logging.error(f"Database error: {str(e)}")
         return {'status': "Internal server error"}, 500  # Internal Server Error
