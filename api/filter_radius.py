@@ -21,3 +21,10 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     c = 2 * atan2(sqrt(a), sqrt(1 - a))
     R = 6371000  # Radius bumi dalam meter
     return R * c
+
+def get_valid_office_name(user_lat, user_lon):
+    for office in OFFICE_LOCATIONS:
+        distance = calculate_distance(user_lat, user_lon, office["lat"], office["lon"])
+        if distance <= RADIUS_ALLOWED:
+            return office["name"]  # Langsung return nama lokasi yang cocok
+    return None  # Tidak ada lokasi yang cocok

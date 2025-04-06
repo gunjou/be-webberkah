@@ -4,7 +4,7 @@ from flask_jwt_extended import jwt_required
 from .config import get_timezone
 from .query import get_list_absensi, add_checkin, update_checkout
 from .face_detection import verifikasi_wajah
-from .filter_radius import OFFICE_LOCATIONS, RADIUS_ALLOWED, calculate_distance
+from .filter_radius import calculate_distance, get_valid_office_name
 
 
 absensi_bp = Blueprint('api', __name__)
@@ -85,12 +85,7 @@ def check_in(id_karyawan):
         return jsonify({'error': 'Invalid latitude or longitude'}), 400
 
     # Cek apakah user dalam radius lokasi yang diizinkan
-    lokasi_absensi = None
-    for office in OFFICE_LOCATIONS:
-        distance = calculate_distance(office["lat"], office["lon"], user_lat, user_lon)
-        if distance <= RADIUS_ALLOWED:
-            lokasi_absensi = office["name"]
-            break  # Hentikan loop jika sudah menemukan lokasi yang valid
+    lokasi_absensi = get_valid_office_name(user_lat, user_lon)
 
     if lokasi_absensi is None:
         return jsonify({'status': 'error', 'message': 'You are outside the attendance area'}), 403
@@ -108,7 +103,7 @@ def check_in(id_karyawan):
         tanggal, jam_masuk = get_timezone()
         
         # Menambahkan check-in
-        result = add_checkin(id_karyawan, tanggal, jam_masuk)
+        result = add_checkin(id_karyawan, tanggal, jam_masuk, lokasi_absensi)
         if result is None:
             return jsonify({'status': 'Failed to record check-in'}), 500
         
@@ -126,7 +121,6 @@ def check_out(id_karyawan):
     # Ambil latitude dan longitude dari form-data
     user_lat = request.form.get('latitude')
     user_lon = request.form.get('longitude')
-    -8.640498963960535, 116.09404163169187
 
     if not user_lat or not user_lon:
         return jsonify({'error': 'Location data is required'}), 400
@@ -139,12 +133,7 @@ def check_out(id_karyawan):
         return jsonify({'error': 'Invalid latitude or longitude'}), 400
 
     # Cek apakah user dalam radius lokasi yang diizinkan
-    lokasi_absensi = None
-    for office in OFFICE_LOCATIONS:
-        distance = calculate_distance(office["lat"], office["lon"], user_lat, user_lon)
-        if distance <= RADIUS_ALLOWED:
-            lokasi_absensi = office["name"]
-            break
+    lokasi_absensi = get_valid_office_name(user_lat, user_lon)
 
     if lokasi_absensi is None:
         return jsonify({'status': 'error', 'message': 'You are outside the attendance area'}), 403
@@ -162,7 +151,7 @@ def check_out(id_karyawan):
         tanggal, jam_keluar = get_timezone()
         
         # Update jam keluar
-        result = update_checkout(id_karyawan, tanggal, jam_keluar)
+        result = update_checkout(id_karyawan, tanggal, jam_keluar, lokasi_absensi)
         if result is None or result == 0:
             return jsonify({'status': 'Failed to record check-out or no check-in found'}), 500
         

@@ -216,16 +216,27 @@ def get_list_absensi():
         print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
         return []  # Mengembalikan daftar kosong jika terjadi kesalahan
 
-def add_checkin(id_karyawan, tanggal, jam_masuk):
+def add_checkin(id_karyawan, tanggal, jam_masuk, lokasi_absensi):
     datetime_now = get_datetime_now()
     try:
         result = connection.execute(
-            text("""INSERT INTO Absensi (id_karyawan, tanggal, jam_masuk, jam_keluar, created_at, updated_at, status) 
-                     VALUES (:id_karyawan, :tanggal, :jam_masuk, NULL, :created_at, :updated_at, 1)"""),
+            text("""INSERT INTO Absensi (
+                 id_karyawan, 
+                 tanggal, 
+                 jam_masuk, 
+                 jam_keluar, 
+                 lokasi_masuk, 
+                 lokasi_keluar, 
+                 created_at, 
+                 updated_at, 
+                 status
+                 ) 
+                     VALUES (:id_karyawan, :tanggal, :jam_masuk, NULL, :lokasi_masuk, NULL, :created_at, :updated_at, 1)"""),
             {
                 "id_karyawan": id_karyawan,
                 "tanggal": tanggal,
                 "jam_masuk": jam_masuk,
+                "lokasi_masuk": lokasi_absensi,
                 "created_at": datetime_now,
                 "updated_at": datetime_now
             }
@@ -240,16 +251,18 @@ def add_checkin(id_karyawan, tanggal, jam_masuk):
         print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
         return None  # Mengembalikan None jika terjadi kesalahan
 
-def update_checkout(id_karyawan, tanggal, jam_keluar):
+def update_checkout(id_karyawan, tanggal, jam_keluar, lokasi_absensi):
     datetime_now = get_datetime_now()
     try:
         result = connection.execute(
             text("""UPDATE Absensi 
                     SET jam_keluar = :jam_keluar,
+                    lokasi_keluar = :lokasi_keluar,
                     updated_at = :updated_at
                     WHERE id_karyawan = :id_karyawan AND tanggal = :tanggal AND jam_keluar IS NULL"""),
             {
                 "jam_keluar": jam_keluar,
+                "lokasi_keluar": lokasi_absensi,
                 "id_karyawan": id_karyawan,
                 "tanggal": tanggal,
                 "updated_at": datetime_now
