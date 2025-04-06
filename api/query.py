@@ -1,9 +1,9 @@
-from datetime import datetime
+from datetime import date, datetime, time
 from flask_jwt_extended import create_access_token
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from .config import get_connection, get_timezone
+from .config import get_connection, get_timezone, get_datetime_now
 
 
 connection = get_connection().connect()
@@ -217,14 +217,17 @@ def get_list_absensi():
         return []  # Mengembalikan daftar kosong jika terjadi kesalahan
 
 def add_checkin(id_karyawan, tanggal, jam_masuk):
+    datetime_now = get_datetime_now()
     try:
         result = connection.execute(
-            text("""INSERT INTO Absensi (id_karyawan, tanggal, jam_masuk, jam_keluar, status) 
-                     VALUES (:id_karyawan, :tanggal, :jam_masuk, NULL, 1)"""),
+            text("""INSERT INTO Absensi (id_karyawan, tanggal, jam_masuk, jam_keluar, created_at, updated_at, status) 
+                     VALUES (:id_karyawan, :tanggal, :jam_masuk, NULL, :created_at, :updated_at, 1)"""),
             {
                 "id_karyawan": id_karyawan,
                 "tanggal": tanggal,
-                "jam_masuk": jam_masuk
+                "jam_masuk": jam_masuk,
+                "created_at": datetime_now,
+                "updated_at": datetime_now
             }
         )
         
@@ -238,15 +241,18 @@ def add_checkin(id_karyawan, tanggal, jam_masuk):
         return None  # Mengembalikan None jika terjadi kesalahan
 
 def update_checkout(id_karyawan, tanggal, jam_keluar):
+    datetime_now = get_datetime_now()
     try:
         result = connection.execute(
             text("""UPDATE Absensi 
-                     SET jam_keluar = :jam_keluar 
-                     WHERE id_karyawan = :id_karyawan AND tanggal = :tanggal AND jam_keluar IS NULL"""),
+                    SET jam_keluar = :jam_keluar,
+                    updated_at = :updated_at
+                    WHERE id_karyawan = :id_karyawan AND tanggal = :tanggal AND jam_keluar IS NULL"""),
             {
                 "jam_keluar": jam_keluar,
                 "id_karyawan": id_karyawan,
-                "tanggal": tanggal
+                "tanggal": tanggal,
+                "updated_at": datetime_now
             }
         )
         
@@ -294,3 +300,43 @@ def get_login(username, password):
         print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
         return {'msg': 'Internal server error'}, 500
     
+
+'''<--- Query Check Status Presensi --->'''
+def get_check_presensi(id_karyawan):
+    today, _ = get_timezone()  # Mendapatkan tanggal hari ini
+    print(today)
+    try:
+        result = connection.execute(
+            text("""
+                SELECT tanggal, jam_masuk, jam_keluar, lokasi_masuk, lokasi_keluar
+                FROM Absensi 
+                WHERE id_karyawan = :id_karyawan
+                AND tanggal = :today
+                ORDER BY jam_masuk DESC
+                LIMIT 1;
+            """),
+            {
+                "id_karyawan": id_karyawan,
+                "today": today
+            }
+        ).mappings().fetchone()  # Mengambil satu record sebagai dictionary
+
+        if result is None:
+            return None
+
+        result_dict = dict(result)
+
+        # Format tanggal dan waktu sesuai keinginan
+        for key in result_dict:
+            val = result_dict[key]
+            if isinstance(val, datetime):
+                result_dict[key] = val.strftime('%Y-%m-%d %H:%M:%S')
+            elif isinstance(val, date):
+                result_dict[key] = val.strftime('%Y-%m-%d')
+            elif isinstance(val, time):
+                result_dict[key] = val.strftime('%H:%M:%S')
+
+        return result_dict
+    except SQLAlchemyError as e:
+        print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
+        return None  # Mengembalikan None jika terjadi kesalahan

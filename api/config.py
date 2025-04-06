@@ -20,3 +20,9 @@ def get_timezone():
 
     return tanggal_now, jam_now
 
+def get_datetime_now():
+    wita = pytz.timezone("Asia/Makassar")
+    now = datetime.now(wita)
+    formatted_time = now.strftime("%Y-%m-%d %H:%M:%S.") + f"{int(now.microsecond / 1000):03d}"
+
+    return formatted_time
