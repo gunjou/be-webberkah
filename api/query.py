@@ -281,7 +281,7 @@ def update_checkout(id_karyawan, tanggal, jam_keluar, lokasi_absensi):
     
 
 '''<--- Query untuk Login --->'''
-def get_login(username, password):
+def get_login_karyawan(username, password):
     try:
         # Menggunakan query untuk memverifikasi username dan password
         result = connection.execute(
@@ -311,7 +311,37 @@ def get_login(username, password):
             'nama': result['nama']}
     except SQLAlchemyError as e:
         print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
-        return {'msg': 'Internal server error'}, 500
+        return {'msg': 'Internal server error'}
+    
+def get_login_admin(username, password):
+    try:
+        # Menggunakan query untuk memverifikasi username dan password
+        result = connection.execute(
+            text("""
+                SELECT id_admin, nama, username, password, status
+                FROM Admin
+                WHERE username = :username
+                AND password = :password
+                AND status = 1;
+            """),
+            {
+                "username": username,
+                "password": password
+            }
+        ).mappings().fetchone()
+
+        if not result:
+            return None
+            
+        access_token = create_access_token(identity=str(result['id_admin']))
+        return {
+            'access_token': access_token,
+            'message': 'login success',
+            'id_admin': result['id_admin'],
+            'nama': result['nama']}
+    except SQLAlchemyError as e:
+        print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
+        return {'msg': 'Internal server error'}
     
 
 '''<--- Query Check Status Presensi --->'''
