@@ -4,7 +4,7 @@ from flask_jwt_extended import jwt_required
 from .config import get_timezone
 from .query import get_list_absensi, add_checkin, update_checkout
 from .face_detection import verifikasi_wajah
-from .filter_radius import calculate_distance, get_valid_office_name
+from .filter_radius import get_valid_office_name
 
 
 absensi_bp = Blueprint('api', __name__)

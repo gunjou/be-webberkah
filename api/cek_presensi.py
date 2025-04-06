@@ -1,5 +1,5 @@
 from flask import Blueprint
-# from flask_jwt_extended import jwt_required
+from flask_jwt_extended import jwt_required
 
 from .query import get_check_presensi
 
@@ -7,7 +7,7 @@ from .query import get_check_presensi
 cek_presensi_bp = Blueprint('api', __name__)
 
 @cek_presensi_bp.route('/cek_presensi/<int:id_karyawan>', methods=['GET'])
-# @jwt_required()
+@jwt_required()
 def absensi(id_karyawan):
     cek_presensi = get_check_presensi(id_karyawan)
         
