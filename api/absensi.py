@@ -1,5 +1,7 @@
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required
+import pytz
+from datetime import time
 
 from .config import get_timezone
 from .query import get_list_absensi, add_checkin, update_checkout
@@ -19,6 +21,27 @@ def hitung_selisih_waktu(jam_masuk, jam_keluar):
     
     return f"{jam} jam {menit} menit"
 
+def hitung_keterlambatan(jam_masuk):
+    wita = pytz.timezone("Asia/Makassar")
+
+    # Konversi ke waktu WITA jika jam_masuk aware
+    if jam_masuk.tzinfo is not None:
+        jam_masuk = jam_masuk.astimezone(wita).time()
+
+    jam_masuk_batas = time(8, 0)  # Jam 08:00 WITA
+
+    if jam_masuk <= jam_masuk_batas:
+        return None
+
+    # Hitung selisih dalam menit
+    selisih = (jam_masuk.hour * 60 + jam_masuk.minute) - (jam_masuk_batas.hour * 60 + jam_masuk_batas.minute)
+    jam, menit = divmod(selisih, 60)
+
+    if jam == 0:
+        return f"{menit} menit"
+    else:
+        return f"{jam} jam {menit} menit"
+
 @absensi_bp.route('/absensi', methods=['GET'])
 @jwt_required()
 def absensi():
@@ -33,6 +56,9 @@ def absensi():
         'tanggal': row['tanggal'].strftime("%d-%m-%Y"),
         'jam_masuk': row['jam_masuk'].strftime('%H:%M:%S'),
         'jam_keluar': row['jam_keluar'].strftime('%H:%M:%S') if row['jam_keluar'] else "Belum check-out",  # Menangani jam_keluar yang None
+        'lokasi_masuk': row['lokasi_masuk'],
+        'lokasi_keluar': row['lokasi_keluar'],
+        'waktu_terlambat': hitung_keterlambatan(row['jam_masuk']),
         'selisih': hitung_selisih_waktu(row['jam_masuk'], row['jam_keluar'])
     } for index, row in enumerate(list_absensi)]
     

@@ -200,11 +200,11 @@ def get_list_absensi():
     try:
         result = connection.execute(
             text("""
-                SELECT a.id_absensi, a.id_karyawan, k.nama, k.id_jenis, j.jenis, a.tanggal, a.jam_masuk, a.jam_keluar 
+                SELECT a.id_absensi, a.id_karyawan, k.nama, k.id_jenis, j.jenis, a.tanggal, a.jam_masuk, a.jam_keluar, a.lokasi_masuk, a.lokasi_keluar  
                 FROM Absensi a 
                 INNER JOIN Karyawan k ON k.id_karyawan = a.id_karyawan 
                 INNER JOIN Jeniskaryawan j ON k.id_jenis = j.id_jenis 
-                WHERE a.status = 1 AND a.tanggal = :today
+                WHERE a.status = 1 AND a.tanggal = :today;
             """),
             {"today": today}  # Menggunakan parameter binding untuk mencegah SQL injection
         )
