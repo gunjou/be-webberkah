@@ -6,6 +6,7 @@ foto_pegawai/
 venv_webhook/
 deploy.sh
 webhook.py
+_crop.py
 
 ### Flask ###
 instance/*
