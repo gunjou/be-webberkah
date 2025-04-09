@@ -1,15 +1,21 @@
-from datetime import datetime
+import os
 import pytz
+from datetime import datetime
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 
 
+load_dotenv()
+
 def get_connection():
     # server = 'localhost:5432' # localhost
-    server = '109.106.255.215:5432' # server
-    database = 'webberkah'
-    username = 'berkah'
-    password = 'berkah'
-    return create_engine(f'postgresql+psycopg2://{username}:{password}@{server}/{database}')
+    host = os.getenv("DB_HOST", "localhost")
+    port = os.getenv("DB_PORT", "5432")
+    dbname = os.getenv("DB_NAME")
+    username = os.getenv("DB_USER")
+    password = os.getenv("DB_PASS")
+
+    return create_engine(f'postgresql+psycopg2://{username}:{password}@{host}:{port}/{dbname}')
 
 def get_timezone():
     wita = pytz.timezone("Asia/Makassar")
