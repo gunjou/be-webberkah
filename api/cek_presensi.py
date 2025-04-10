@@ -16,10 +16,10 @@ def absensi(id_karyawan):
 
     result = {
         "tanggal": cek_presensi["tanggal"],
-        "jam_masuk": cek_presensi["jam_masuk"],
-        "jam_keluar": cek_presensi["jam_keluar"],
-        "lokasi_masuk": cek_presensi["lokasi_masuk"],
-        "lokasi_keluar": cek_presensi["lokasi_keluar"]
+        "jam_masuk": cek_presensi["jam_masuk"].strftime('%H:%M') if cek_presensi['jam_masuk'] else None,
+        "jam_keluar": cek_presensi["jam_keluar"].strftime('%H:%M') if cek_presensi['jam_keluar'] else None,
+        "lokasi_masuk": cek_presensi["lokasi_masuk"] if cek_presensi["lokasi_masuk"] else None,
+        "lokasi_keluar": cek_presensi["lokasi_keluar"] if cek_presensi["lokasi_keluar"] else None
     }
     
     return result, 200

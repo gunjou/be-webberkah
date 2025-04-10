@@ -367,19 +367,8 @@ def get_check_presensi(id_karyawan):
         if result is None:
             return None
 
-        result_dict = dict(result)
+        return dict(result)
 
-        # Format tanggal dan waktu sesuai keinginan
-        for key in result_dict:
-            val = result_dict[key]
-            if isinstance(val, datetime):
-                result_dict[key] = val.strftime('%Y-%m-%d %H:%M:%S')
-            elif isinstance(val, date):
-                result_dict[key] = val.strftime('%Y-%m-%d')
-            elif isinstance(val, time):
-                result_dict[key] = val.strftime('%H:%M:%S')
-
-        return result_dict
     except SQLAlchemyError as e:
         print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
         return None  # Mengembalikan None jika terjadi kesalahan

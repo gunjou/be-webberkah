@@ -12,35 +12,33 @@ from .filter_radius import get_valid_office_name
 absensi_bp = Blueprint('api', __name__)
 
 
-def hitung_selisih_waktu(jam_masuk, jam_keluar):
-    if jam_keluar is None:  # Jika jam_keluar belum ada
-        return "Belum check-out"
-    
-    selisih = (jam_keluar.hour * 60 + jam_keluar.minute) - (jam_masuk.hour * 60 + jam_masuk.minute)
-    jam, menit = divmod(selisih, 60)
-    
-    return f"{jam} jam {menit} menit"
+def hitung_waktu_kerja(jam_masuk, jam_keluar):
+    if jam_keluar is None:
+        return 0  # Belum check-out, waktu kerja dianggap 0 menit
+
+    total_masuk = jam_masuk.hour * 60 + jam_masuk.minute
+    total_keluar = jam_keluar.hour * 60 + jam_keluar.minute
+
+    selisih = total_keluar - total_masuk
+    return max(selisih, 0)  # Hindari nilai negatif jika jam_keluar lebih kecil (data tidak valid)
+
 
 def hitung_keterlambatan(jam_masuk):
     wita = pytz.timezone("Asia/Makassar")
 
-    # Konversi ke waktu WITA jika jam_masuk aware
+    # Konversi ke waktu WITA jika aware
     if jam_masuk.tzinfo is not None:
         jam_masuk = jam_masuk.astimezone(wita).time()
 
     jam_masuk_batas = time(8, 0)  # Jam 08:00 WITA
 
     if jam_masuk <= jam_masuk_batas:
-        return None
+        return 0  # Tidak terlambat
 
-    # Hitung selisih dalam menit
-    selisih = (jam_masuk.hour * 60 + jam_masuk.minute) - (jam_masuk_batas.hour * 60 + jam_masuk_batas.minute)
-    jam, menit = divmod(selisih, 60)
+    # Hitung selisih menit
+    terlambat = (jam_masuk.hour * 60 + jam_masuk.minute) - (jam_masuk_batas.hour * 60 + jam_masuk_batas.minute)
+    return terlambat
 
-    if jam == 0:
-        return f"{menit} menit"
-    else:
-        return f"{jam} jam {menit} menit"
 
 @absensi_bp.route('/absensi', methods=['GET'])
 @jwt_required()
@@ -54,12 +52,17 @@ def absensi():
         'id_jenis': row['id_jenis'],
         'jenis': row['jenis'],
         'tanggal': row['tanggal'].strftime("%d-%m-%Y"),
-        'jam_masuk': row['jam_masuk'].strftime('%H:%M:%S'),
-        'jam_keluar': row['jam_keluar'].strftime('%H:%M:%S') if row['jam_keluar'] else "Belum check-out",  # Menangani jam_keluar yang None
-        'lokasi_masuk': row['lokasi_masuk'],
-        'lokasi_keluar': row['lokasi_keluar'],
+        'jam_masuk': row['jam_masuk'].strftime('%H:%M') if row['jam_masuk'] else None,
+        'jam_keluar': row['jam_keluar'].strftime('%H:%M') if row['jam_keluar'] else None,  # Menangani jam_keluar yang None
+        'lokasi_masuk': row['lokasi_masuk'] if row['lokasi_masuk'] else None,
+        'lokasi_keluar': row['lokasi_keluar'] if row['lokasi_keluar'] else None,
+        'status_absen': (
+            'Belum Check-in' if row['jam_masuk'] is None else
+            'Belum Check-out' if row['jam_keluar'] is None else
+            'Selesai bekerja'
+        ),
         'waktu_terlambat': hitung_keterlambatan(row['jam_masuk']),
-        'jumlah_jam_kerja': hitung_selisih_waktu(row['jam_masuk'], row['jam_keluar'])
+        'jumlah_jam_kerja': hitung_waktu_kerja(row['jam_masuk'], row['jam_keluar'])
     } for index, row in enumerate(list_absensi)]
     
     return {'absensi': result}, 200  # Mengembalikan hasil dalam format JSON
