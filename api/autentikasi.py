@@ -1,13 +1,20 @@
 from flask import Blueprint, logging, request
 from sqlalchemy.exc import SQLAlchemyError
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import jwt_required, get_jwt
 
 from .query import get_login_karyawan, get_login_admin
+from .blacklist_store import blacklist
 
 
 autentikasi_bp = Blueprint('api', __name__)
 
-"""<- Login & Logout Pegawai ->"""
+"""<-- Chck token -->"""
+@autentikasi_bp.route('/protected', methods=['GET'])
+@jwt_required()
+def protected():
+    return {'status': 'Token masih valid'}, 200
+
+"""<-- Login & Logout Pegawai -->"""
 @autentikasi_bp.route('/login/karyawan', methods=['POST'])
 def login_karyawan():
     auth = request.get_json()
@@ -31,11 +38,14 @@ def login_karyawan():
 @autentikasi_bp.route('/logout/karyawan', methods=['POST'])
 @jwt_required()  # Ensure the user is authenticated
 def logout_karyawan():
-    # In a simple implementation, you can just return a success message
-    return {'status': "Successfully logged out"}, 200  # OK
+    jti = request.json.get('jti')
+    if jti:
+        blacklist.add(jti)
+        return {"msg": "Logout successful"}, 200
+    return {"msg": "Missing JTI"}, 400
 
 
-"""<- Login & Logout Admin ->"""
+"""<-- Login & Logout Admin -->"""
 @autentikasi_bp.route('/login/admin', methods=['POST'])
 def login_admin():
     auth = request.get_json()

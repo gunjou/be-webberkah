@@ -195,28 +195,7 @@ def remove_karyawan(id_emp):
 
 
 '''<--- Query untuk Table Absensi --->'''
-def get_list_absensi():
-    today, _ = get_timezone()  # Mendapatkan tanggal hari ini
-    try:
-        result = connection.execute(
-            text("""
-                SELECT a.id_absensi, a.id_karyawan, k.nama, k.id_jenis, j.jenis, a.tanggal, a.jam_masuk, a.jam_keluar, a.lokasi_masuk, a.lokasi_keluar  
-                FROM Absensi a 
-                INNER JOIN Karyawan k ON k.id_karyawan = a.id_karyawan 
-                INNER JOIN Jeniskaryawan j ON k.id_jenis = j.id_jenis 
-                WHERE a.status = 1 AND a.tanggal = :today;
-            """),
-            {"today": today}  # Menggunakan parameter binding untuk mencegah SQL injection
-        )
-        
-        # Mengonversi hasil menjadi daftar dictionary
-        absensi_list = [dict(row) for row in result.mappings()]  # Mengonversi hasil ke dalam format dictionary
-        return absensi_list
-    except SQLAlchemyError as e:
-        print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
-        return []  # Mengembalikan daftar kosong jika terjadi kesalahan
-
-def add_checkin(id_karyawan, tanggal, jam_masuk, lokasi_absensi):
+def add_checkin(id_karyawan, tanggal, jam_masuk, lokasi_absensi, jam_terlambat):
     datetime_now = get_datetime_now()
     try:
         result = connection.execute(
@@ -227,16 +206,19 @@ def add_checkin(id_karyawan, tanggal, jam_masuk, lokasi_absensi):
                  jam_keluar, 
                  lokasi_masuk, 
                  lokasi_keluar, 
+                 jam_terlambat, 
                  created_at, 
                  updated_at, 
-                 status
+                 status,
+                 id_status
                  ) 
-                     VALUES (:id_karyawan, :tanggal, :jam_masuk, NULL, :lokasi_masuk, NULL, :created_at, :updated_at, 1)"""),
+                     VALUES (:id_karyawan, :tanggal, :jam_masuk, NULL, :lokasi_masuk, NULL, :jam_terlambat, :created_at, :updated_at, 1, 1)"""),
             {
                 "id_karyawan": id_karyawan,
                 "tanggal": tanggal,
                 "jam_masuk": jam_masuk,
                 "lokasi_masuk": lokasi_absensi,
+                "jam_terlambat": jam_terlambat,
                 "created_at": datetime_now,
                 "updated_at": datetime_now
             }
@@ -251,13 +233,14 @@ def add_checkin(id_karyawan, tanggal, jam_masuk, lokasi_absensi):
         print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
         return None  # Mengembalikan None jika terjadi kesalahan
 
-def update_checkout(id_karyawan, tanggal, jam_keluar, lokasi_absensi):
+def update_checkout(id_karyawan, tanggal, jam_keluar, lokasi_absensi, total_jam_kerja):
     datetime_now = get_datetime_now()
     try:
         result = connection.execute(
             text("""UPDATE Absensi 
                     SET jam_keluar = :jam_keluar,
                     lokasi_keluar = :lokasi_keluar,
+                    total_jam_kerja = :total_jam_kerja,
                     updated_at = :updated_at
                     WHERE id_karyawan = :id_karyawan AND tanggal = :tanggal AND jam_keluar IS NULL"""),
             {
@@ -265,6 +248,7 @@ def update_checkout(id_karyawan, tanggal, jam_keluar, lokasi_absensi):
                 "lokasi_keluar": lokasi_absensi,
                 "id_karyawan": id_karyawan,
                 "tanggal": tanggal,
+                "total_jam_kerja": total_jam_kerja,
                 "updated_at": datetime_now
             }
         )
@@ -279,6 +263,67 @@ def update_checkout(id_karyawan, tanggal, jam_keluar, lokasi_absensi):
         print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
         return None  # Mengembalikan None jika terjadi kesalahan
     
+def get_list_absensi():
+    today, _ = get_timezone()  # Mendapatkan tanggal hari ini
+    try:
+        result = connection.execute(
+            text("""
+                SELECT a.id_absensi, 
+                    a.id_karyawan, 
+                    k.nama, 
+                    k.id_jenis, 
+                    j.jenis, 
+                    a.tanggal, 
+                    a.jam_masuk, 
+                    a.jam_keluar, 
+                    a.lokasi_masuk, 
+                    a.lokasi_keluar, 
+                    a.jam_terlambat, 
+                    a.total_jam_kerja, 
+                    s.id_status AS id_presensi, 
+                    s.nama_status AS status_presensi  
+                FROM Absensi a 
+                INNER JOIN Karyawan k ON k.id_karyawan = a.id_karyawan 
+                INNER JOIN Jeniskaryawan j ON k.id_jenis = j.id_jenis 
+                INNER JOIN StatusPresensi s ON a.id_status = s.id_status 
+                WHERE a.status = 1 AND a.tanggal = :today;
+            """),
+            {"today": today}  # Menggunakan parameter binding untuk mencegah SQL injection
+        )
+        
+        # Mengonversi hasil menjadi daftar dictionary
+        absensi_list = [dict(row) for row in result.mappings()]  # Mengonversi hasil ke dalam format dictionary
+        return absensi_list
+    except SQLAlchemyError as e:
+        print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
+        return []  # Mengembalikan daftar kosong jika terjadi kesalahan
+    
+def get_list_tidak_hadir():
+    today, _ = get_timezone()  # Mendapatkan tanggal hari ini
+    try:
+        result = connection.execute(
+            text("""
+                SELECT 
+                    k.id_karyawan,
+                    k.nama,
+                    k.id_jenis,
+                    j.jenis,
+                    :today AS tanggal
+                FROM Karyawan k
+                JOIN JenisKaryawan j ON k.id_jenis = j.id_jenis
+                LEFT JOIN Absensi a ON k.id_karyawan = a.id_karyawan AND a.tanggal = :today
+                WHERE a.id_absensi IS NULL
+            """),
+            {"today": today}  # Menggunakan parameter binding untuk mencegah SQL injection
+        )
+        
+        # Mengonversi hasil menjadi daftar dictionary
+        absensi_list = [dict(row) for row in result.mappings()]  # Mengonversi hasil ke dalam format dictionary
+        return absensi_list
+    except SQLAlchemyError as e:
+        print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
+        return []  # Mengembalikan daftar kosong jika terjadi kesalahan
+
 
 '''<--- Query untuk Login --->'''
 def get_login_karyawan(username, password):
@@ -347,11 +392,11 @@ def get_login_admin(username, password):
 '''<--- Query Check Status Presensi --->'''
 def get_check_presensi(id_karyawan):
     today, _ = get_timezone()  # Mendapatkan tanggal hari ini
-    print(today)
+    # print(today)
     try:
         result = connection.execute(
             text("""
-                SELECT tanggal, jam_masuk, jam_keluar, lokasi_masuk, lokasi_keluar
+                SELECT tanggal, jam_masuk, jam_keluar, lokasi_masuk, lokasi_keluar, jam_terlambat
                 FROM Absensi 
                 WHERE id_karyawan = :id_karyawan
                 AND tanggal = :today
