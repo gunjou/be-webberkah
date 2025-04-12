@@ -1,4 +1,3 @@
-from datetime import date, datetime, time
 from flask_jwt_extended import create_access_token
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -101,7 +100,7 @@ def get_karyawan(id):
     try:
         # Mencari karyawan berdasarkan ID
         result = connection.execute(
-            text("SELECT * FROM Karyawan WHERE id_karyawan = :id"),
+            text("SELECT * FROM Karyawan WHERE id_karyawan = :id AND status = 1"),
             {"id": id}
         ).mappings().fetchone()  # Mengambil satu record sebagai dictionary
 
@@ -312,7 +311,7 @@ def get_list_tidak_hadir():
                 FROM Karyawan k
                 JOIN JenisKaryawan j ON k.id_jenis = j.id_jenis
                 LEFT JOIN Absensi a ON k.id_karyawan = a.id_karyawan AND a.tanggal = :today
-                WHERE a.id_absensi IS NULL
+                WHERE k.status = 1 AND a.id_absensi IS NULL
             """),
             {"today": today}  # Menggunakan parameter binding untuk mencegah SQL injection
         )
@@ -400,6 +399,7 @@ def get_check_presensi(id_karyawan):
                 FROM Absensi 
                 WHERE id_karyawan = :id_karyawan
                 AND tanggal = :today
+                AND status = 1
                 ORDER BY jam_masuk DESC
                 LIMIT 1;
             """),
