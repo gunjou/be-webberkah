@@ -1,10 +1,11 @@
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required
 import pytz
-from datetime import time
+from datetime import datetime, time
+import re
 
 from .config import get_timezone
-from .query import get_list_absensi, add_checkin, update_checkout, get_list_tidak_hadir, get_check_presensi
+from .query import get_list_absensi, add_checkin, update_checkout, get_list_tidak_hadir, get_check_presensi, update_absensi_times, remove_abseni
 from .face_detection import verifikasi_wajah
 from .filter_radius import get_valid_office_name
 
@@ -204,4 +205,54 @@ def absensi_tidak_hadir():
     } for index, row in enumerate(list_tidak_hadir)]
     
     return {'absensi': result}, 200  # Mengembalikan hasil dalam format JSON
-    
+
+@absensi_bp.route('/absensi/edit/<int:id_absensi>', methods=['PUT'])
+@jwt_required()
+def edit_absensi(id_absensi):
+    data = request.json
+    jam_masuk = data.get("jam_masuk")
+    jam_keluar = data.get("jam_keluar")
+
+    # Validasi format waktu HH:MM
+    def is_valid_time_format(t):
+        return bool(re.match(r"^\d{2}:\d{2}$", t))
+
+    if not jam_masuk:
+        return {'status': 'Jam masuk wajib diisi'}, 400
+    if not is_valid_time_format(jam_masuk):
+        return {'status': 'Format jam masuk tidak valid. Gunakan format HH:MM'}, 400
+    if jam_keluar and not is_valid_time_format(jam_keluar):
+        return {'status': 'Format jam keluar tidak valid. Gunakan format HH:MM'}, 400
+
+    # Jika jam_keluar berupa string kosong, perlakukan sebagai None
+    if jam_keluar == "":
+        jam_keluar = None
+        total_jam_kerja = None
+    else:
+        total_jam_kerja = hitung_waktu_kerja(
+            datetime.strptime(jam_masuk, "%H:%M").time(),
+            datetime.strptime(jam_keluar, "%H:%M").time()
+            )
+
+    jam_terlambat = hitung_keterlambatan(datetime.strptime(jam_masuk, "%H:%M").time())
+    print(jam_terlambat)
+
+    result = update_absensi_times(id_absensi, jam_masuk, jam_keluar, jam_terlambat, total_jam_kerja)
+
+    if result is None:
+        return {'status': 'Terjadi kesalahan saat memperbarui data'}, 500
+    if result == 0:
+        return {'status': 'Data tidak ditemukan atau tidak berhasil diperbarui'}, 404
+
+    return {'status': 'Data absensi berhasil diperbarui'}, 200
+
+@absensi_bp.route('/absensi/delete/<int:id_absensi>', methods=['PUT'])
+@jwt_required()
+def delete_absensi(id_absensi):
+    try:
+        result = remove_abseni(id_absensi)
+        if result is None or result == 0:
+            return {'status': "Gagal menghapus absensi"}, 500
+        return {'status': "Berhasil menghapus absensi"}, 200
+    except Exception as e:
+        return {'status': f"Terjadi kesalahan: {str(e)}"}, 500

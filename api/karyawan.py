@@ -1,5 +1,5 @@
 from flask import Blueprint, request
-# from flask_jwt_extended import jwt_required
+from flask_jwt_extended import jwt_required
 from sqlalchemy.exc import SQLAlchemyError
 
 from .query import get_list_jenis, get_list_karyawan, add_jenis, add_karyawan, update_karyawan, remove_karyawan, get_karyawan
@@ -10,28 +10,29 @@ karyawan_bp = Blueprint('api', __name__)
 '''<--- Table Jenis Karyawan --->'''
 @karyawan_bp.route('/jenis', methods=['GET'])
 def list_jenis():
-    jenis_list = get_list_jenis()  # Memanggil fungsi yang sudah dioptimalkan
-    return {'jenis_karyawan': jenis_list}, 200  # Mengembalikan hasil dalam format JSON
+    jenis_list = get_list_jenis()
+    return {'jenis_karyawan': jenis_list}, 200  # OK
+
 
 @karyawan_bp.route('/jenis', methods=['POST'])
 def tambah_jenis():
     jenis = request.json.get("jenis", None)
 
     if not jenis:
-        return {'status': "Field can't be blank"}, 400  # Menggunakan 400 untuk Bad Request
+        return {'status': "Kolom 'jenis' tidak boleh kosong"}, 400  # Bad Request
 
     try:
-        jenis_id = add_jenis(jenis)  # Menyimpan ID jenis yang baru ditambahkan
+        jenis_id = add_jenis(jenis)
         if jenis_id is None:
-            return {'status': "Add data failed"}, 500  # Menggunakan 500 untuk Internal Server Error
-        return {'status': "Success add data", 'jenis': jenis}, 201  # Menggunakan 201 untuk Created
+            return {'status': "Gagal menambahkan data"}, 500  # Internal Server Error
+        return {'status': "Berhasil menambahkan data", 'jenis': jenis}, 201  # Created
     except SQLAlchemyError as e:
-        return {'status': f"Add data failed: {str(e)}"}, 500  # Mengembalikan pesan kesalahan
+        return {'status': f"Gagal menambahkan data: {str(e)}"}, 500
 
 
 '''<--- Table Karyawan --->'''
 @karyawan_bp.route('/karyawan', methods=['GET'])
-# @jwt_required()
+@jwt_required()
 def list_karyawan():
     karyawan_list = get_list_karyawan()  # Tidak perlu memanggil fetchall()
     
@@ -39,6 +40,7 @@ def list_karyawan():
     return {'karyawan': karyawan_list}, 200
 
 @karyawan_bp.route('/karyawan', methods=['POST'])
+@jwt_required()
 def tambah_karyawan():
     data = request.json
     jenis = data.get('jenis')
@@ -48,31 +50,32 @@ def tambah_karyawan():
     password = data.get('password')
 
     if not all([jenis, nama, gaji_pokok, username, password]):
-        return {'status': "All fields are required"}, 400
+        return {'status': "Semua kolom harus diisi"}, 400  # Bad Request
 
     karyawan_id = add_karyawan(jenis, nama, gaji_pokok, username, password)
     
     if karyawan_id is None:
-        return {'status': "Failed to add employee"}, 500
+        return {'status': "Gagal menambahkan karyawan"}, 500  # Internal Server Error
 
-    return {'status': "Employee added successfully", 'nama': nama}, 201
+    return {'status': "Berhasil menambahkan karyawan", 'nama': nama}, 201  # Created
+
 
 @karyawan_bp.route('/karyawan/<int:id>', methods=['PUT'])
+@jwt_required()
 def edit_karyawan(id):
-    # Mencari karyawan berdasarkan ID
     karyawan = get_karyawan(id)
 
     if karyawan is None:
-        return {'status': "Employee not found"}, 404  # Mengembalikan 404 jika tidak ditemukan
+        return {'status': "Karyawan tidak ditemukan"}, 404  # Not Found
 
-    # Mengambil data dari request
+    # Ambil data dari request
     jenis = request.json.get("jenis", None)
     nama = request.json.get("nama", None)
     gaji_pokok = request.json.get("gaji_pokok", None)
     username = request.json.get("username", None)
     password = request.json.get("password", None)
 
-    # Memperbarui data karyawan hanya jika ada input baru
+    # Perbarui data jika ada input baru
     if jenis is not None:
         karyawan['id_jenis'] = jenis
     if nama is not None:
@@ -84,28 +87,34 @@ def edit_karyawan(id):
     if password is not None:
         karyawan['password'] = password
 
-    # Memperbarui karyawan di database
-    result = update_karyawan(karyawan['id_karyawan'], karyawan['id_jenis'], karyawan['nama'], karyawan['gaji_pokok'], karyawan['username'], karyawan['password'])
+    result = update_karyawan(
+        karyawan['id_karyawan'],
+        karyawan['id_jenis'],
+        karyawan['nama'],
+        karyawan['gaji_pokok'],
+        karyawan['username'],
+        karyawan['password']
+    )
     
     if result is None or result == 0:
-        return {'status': "Failed to update employee"}, 500  # Mengembalikan 500 jika gagal
+        return {'status': "Gagal memperbarui data karyawan"}, 500
 
-    return {'status': "Success update data"}, 200  # Mengembalikan 200 jika berhasil
+    return {'status': f"Berhasil memperbarui data {karyawan['nama']}"}, 200
+
 
 @karyawan_bp.route('/karyawan/delete/<int:id>', methods=['PUT'])
+@jwt_required()
 def delete_karyawan(id):
-    # Mencari karyawan berdasarkan ID
     karyawan = get_karyawan(id)
 
     if not karyawan:
-        return {'status': "Employee not found"}, 404
+        return {'status': "Karyawan tidak ditemukan"}, 404
 
-    # Mengubah status karyawan menjadi 0
     try:
+        nama_remove = karyawan['nama']
         result = remove_karyawan(karyawan['id_karyawan'])
         if result is None or result == 0:
-            return {'status': "Failed to update employee status"}, 500
-        return {'status': "Success deleted employee"}, 200
+            return {'status': "Gagal menghapus karyawan"}, 500
+        return {'status': f"Berhasil menghapus {nama_remove}"}, 200
     except Exception as e:
-        return {'status': str(e)}, 500
-
+        return {'status': f"Terjadi kesalahan: {str(e)}"}, 500

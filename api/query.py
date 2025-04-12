@@ -84,9 +84,9 @@ def get_list_karyawan():
         # Menjalankan query untuk mendapatkan daftar karyawan
         result = connection.execute(
             text("""SELECT k.id_karyawan, k.id_jenis, j.jenis, k.nama, k.gaji_pokok, k.username, k.password 
-                     FROM Karyawan k 
-                     INNER JOIN JenisKaryawan j ON k.id_jenis = j.id_jenis 
-                     WHERE k.status = 1;""")
+                FROM Karyawan k 
+                INNER JOIN JenisKaryawan j ON k.id_jenis = j.id_jenis 
+                WHERE k.status = 1 AND j.jenis != 'direktur';""")
         )
         
         # Mengonversi hasil menjadi daftar dictionary
@@ -417,3 +417,65 @@ def get_check_presensi(id_karyawan):
     except SQLAlchemyError as e:
         print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
         return None  # Mengembalikan None jika terjadi kesalahan
+    
+def update_absensi_times(id_absensi, jam_masuk, jam_keluar, jam_terlambat, total_jam_kerja):
+    try:
+        if jam_keluar:  # Jika jam_keluar diisi
+            query = text("""
+                UPDATE Absensi
+                SET jam_masuk = :jam_masuk,
+                    jam_keluar = :jam_keluar,
+                    jam_terlambat = :jam_terlambat,
+                    total_jam_kerja = :total_jam_kerja,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id_absensi = :id_absensi AND status = 1
+            """)
+            params = {
+                'id_absensi': id_absensi,
+                'jam_masuk': jam_masuk,
+                'jam_keluar': jam_keluar,
+                'jam_terlambat': jam_terlambat,
+                'total_jam_kerja': total_jam_kerja
+            }
+        else:  # Jika jam_keluar kosong
+            query = text("""
+                UPDATE Absensi
+                SET jam_masuk = :jam_masuk,
+                    jam_keluar = NULL,
+                    lokasi_keluar = NULL,
+                    jam_terlambat = :jam_terlambat,
+                    total_jam_kerja = NULL,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id_absensi = :id_absensi AND status = 1
+            """)
+            params = {
+                'jam_masuk': jam_masuk,
+                'jam_terlambat': jam_terlambat,
+                'id_absensi': id_absensi
+            }
+
+        result = connection.execute(query, params)
+        connection.commit()
+
+        return result.rowcount  # Kembalikan jumlah baris yang diubah
+    except SQLAlchemyError as e:
+        print(f"Update Absensi Error: {str(e)}")
+        return None
+    
+def remove_abseni(id_abseni):
+    try:
+        # Menggunakan parameter binding untuk keamanan
+        result = connection.execute(
+            text("""UPDATE Absensi SET status = 0, updated_at = CURRENT_TIMESTAMP WHERE id_absensi = :id_abseni"""),
+            {"id_abseni": id_abseni}  # Menggunakan parameter untuk mencegah SQL injection
+        )
+        
+        # Commit perubahan
+        connection.commit()
+        
+        # Mengembalikan jumlah baris yang terpengaruh
+        return result.rowcount  # Mengembalikan jumlah baris yang diupdate
+    except SQLAlchemyError as e:
+        connection.rollback()  # Rollback jika terjadi kesalahan
+        print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
+        return None  # Mengembalikan None atau bisa juga mengangkat exception
