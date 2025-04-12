@@ -466,7 +466,7 @@ def remove_abseni(id_abseni):
     try:
         # Menggunakan parameter binding untuk keamanan
         result = connection.execute(
-            text("""UPDATE Absensi SET status = 0, updated_at = CURRENT_TIMESTAMP WHERE id_absensi = :id_abseni"""),
+            text("""DELETE FROM Absensi WHERE id_absensi = :id_abseni"""),
             {"id_abseni": id_abseni}  # Menggunakan parameter untuk mencegah SQL injection
         )
         
