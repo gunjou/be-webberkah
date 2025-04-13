@@ -232,19 +232,21 @@ def add_checkin(id_karyawan, tanggal, jam_masuk, lokasi_absensi, jam_terlambat):
         print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
         return None  # Mengembalikan None jika terjadi kesalahan
 
-def update_checkout(id_karyawan, tanggal, jam_keluar, lokasi_absensi, total_jam_kerja):
+def update_checkout(id_karyawan, tanggal, jam_keluar, lokasi_absensi, jam_kurang, total_jam_kerja):
     datetime_now = get_datetime_now()
     try:
         result = connection.execute(
             text("""UPDATE Absensi 
                     SET jam_keluar = :jam_keluar,
                     lokasi_keluar = :lokasi_keluar,
+                    jam_kurang = :jam_kurang,
                     total_jam_kerja = :total_jam_kerja,
                     updated_at = :updated_at
                     WHERE id_karyawan = :id_karyawan AND tanggal = :tanggal AND jam_keluar IS NULL"""),
             {
                 "jam_keluar": jam_keluar,
                 "lokasi_keluar": lokasi_absensi,
+                "jam_kurang": jam_kurang,
                 "id_karyawan": id_karyawan,
                 "tanggal": tanggal,
                 "total_jam_kerja": total_jam_kerja,
@@ -438,7 +440,7 @@ def get_check_presensi(id_karyawan):
         print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
         return None  # Mengembalikan None jika terjadi kesalahan
     
-def update_absensi_times(id_absensi, jam_masuk, jam_keluar, jam_terlambat, total_jam_kerja):
+def update_absensi_times(id_absensi, jam_masuk, jam_keluar, jam_terlambat, jam_kurang, total_jam_kerja):
     try:
         if jam_keluar:  # Jika jam_keluar diisi
             query = text("""
@@ -447,6 +449,7 @@ def update_absensi_times(id_absensi, jam_masuk, jam_keluar, jam_terlambat, total
                     jam_keluar = :jam_keluar,
                     jam_terlambat = :jam_terlambat,
                     total_jam_kerja = :total_jam_kerja,
+                    jam_kurang = :jam_kurang,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id_absensi = :id_absensi AND status = 1
             """)
@@ -455,7 +458,8 @@ def update_absensi_times(id_absensi, jam_masuk, jam_keluar, jam_terlambat, total
                 'jam_masuk': jam_masuk,
                 'jam_keluar': jam_keluar,
                 'jam_terlambat': jam_terlambat,
-                'total_jam_kerja': total_jam_kerja
+                'total_jam_kerja': total_jam_kerja,
+                'jam_kurang': jam_kurang
             }
         else:  # Jika jam_keluar kosong
             query = text("""

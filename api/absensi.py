@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required
 import pytz
-from datetime import datetime, time
+from datetime import date, datetime, time
 import re
 
 from .config import get_timezone
@@ -39,6 +39,26 @@ def hitung_keterlambatan(jam_masuk):
     # Hitung selisih menit
     terlambat = (jam_masuk.hour * 60 + jam_masuk.minute) - (jam_masuk_batas.hour * 60 + jam_masuk_batas.minute)
     return terlambat
+
+
+def hitung_jam_kurang(jam_keluar):
+    """
+    Menghitung jumlah menit kekurangan jam kerja jika checkout sebelum jam 17:00.
+    :param jam_keluar_str: string format "HH:MM:SS"
+    :return: int (jumlah menit) atau None jika tidak ada kekurangan
+    """
+    waktu_ideal_pulang = time(17, 0)  # 17:00:00
+
+    try:
+        jam_keluar_obj = datetime.strptime(jam_keluar, "%H:%M:%S").time()
+    except ValueError:
+        return None  # Jika format waktu tidak valid
+
+    if jam_keluar_obj < waktu_ideal_pulang:
+        delta = datetime.combine(date.today(), waktu_ideal_pulang) - datetime.combine(date.today(), jam_keluar_obj)
+        return int(delta.total_seconds() // 60)
+    
+    return None  # Jika checkout >= 17:00
 
 
 """<-- API Check in & Check out -->"""
@@ -150,10 +170,11 @@ def check_out(id_karyawan):
     if not jam_masuk:
         return {"message": "Belum ada jam masuk"}, 200
 
+    jam_kurang = hitung_jam_kurang(jam_keluar)
     total_jam_kerja = hitung_waktu_kerja(jam_masuk, jam_keluar)
 
     # Update jam keluar
-    result = update_checkout(id_karyawan, tanggal, jam_keluar, lokasi_absensi, total_jam_kerja)
+    result = update_checkout(id_karyawan, tanggal, jam_keluar, lokasi_absensi, jam_kurang, total_jam_kerja)
     if result is None or result == 0:
         return jsonify({'status': 'error', 'message': 'Gagal mencatat absen pulang atau tidak ditemukan absen masuk sebelumnya'}), 500
     
@@ -254,12 +275,12 @@ def edit_absensi(id_absensi):
         total_jam_kerja = hitung_waktu_kerja(
             datetime.strptime(jam_masuk, "%H:%M").time(),
             datetime.strptime(jam_keluar, "%H:%M").time()
-            )
+        )
+        jam_kurang = hitung_jam_kurang(jam_keluar)
 
     jam_terlambat = hitung_keterlambatan(datetime.strptime(jam_masuk, "%H:%M").time())
-    print(jam_terlambat)
 
-    result = update_absensi_times(id_absensi, jam_masuk, jam_keluar, jam_terlambat, total_jam_kerja)
+    result = update_absensi_times(id_absensi, jam_masuk, jam_keluar, jam_terlambat, jam_kurang, total_jam_kerja)
 
     if result is None:
         return {'status': 'Terjadi kesalahan saat memperbarui data'}, 500
