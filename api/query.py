@@ -262,8 +262,7 @@ def update_checkout(id_karyawan, tanggal, jam_keluar, lokasi_absensi, total_jam_
         print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
         return None  # Mengembalikan None jika terjadi kesalahan
     
-def get_list_absensi():
-    today, _ = get_timezone()  # Mendapatkan tanggal hari ini
+def get_list_absensi(tanggal):
     try:
         result = connection.execute(
             text("""
@@ -275,30 +274,29 @@ def get_list_absensi():
                     a.tanggal, 
                     a.jam_masuk, 
                     a.jam_keluar, 
+                    a.jam_terlambat, 
+                    a.jam_kurang, 
+                    a.total_jam_kerja, 
                     a.lokasi_masuk, 
                     a.lokasi_keluar, 
-                    a.jam_terlambat, 
-                    a.total_jam_kerja, 
                     s.id_status AS id_presensi, 
                     s.nama_status AS status_presensi  
                 FROM Absensi a 
                 INNER JOIN Karyawan k ON k.id_karyawan = a.id_karyawan 
                 INNER JOIN Jeniskaryawan j ON k.id_jenis = j.id_jenis 
                 INNER JOIN StatusPresensi s ON a.id_status = s.id_status 
-                WHERE a.status = 1 AND a.tanggal = :today;
+                WHERE a.status = 1 AND a.tanggal = :tanggal;
             """),
-            {"today": today}  # Menggunakan parameter binding untuk mencegah SQL injection
+            {"tanggal": tanggal}
         )
-        
-        # Mengonversi hasil menjadi daftar dictionary
-        absensi_list = [dict(row) for row in result.mappings()]  # Mengonversi hasil ke dalam format dictionary
+
+        absensi_list = [dict(row) for row in result.mappings()]
         return absensi_list
     except SQLAlchemyError as e:
-        print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
-        return []  # Mengembalikan daftar kosong jika terjadi kesalahan
+        print(f"Error occurred: {str(e)}")
+        return []
     
-def get_list_tidak_hadir():
-    today, _ = get_timezone()  # Mendapatkan tanggal hari ini
+def get_list_tidak_hadir(tanggal):
     try:
         result = connection.execute(
             text("""
@@ -307,59 +305,69 @@ def get_list_tidak_hadir():
                     k.nama,
                     k.id_jenis,
                     j.jenis,
-                    :today AS tanggal
+                    :tanggal AS tanggal
                 FROM Karyawan k
                 JOIN JenisKaryawan j ON k.id_jenis = j.id_jenis
-                LEFT JOIN Absensi a ON k.id_karyawan = a.id_karyawan AND a.tanggal = :today
+                LEFT JOIN Absensi a ON k.id_karyawan = a.id_karyawan AND a.tanggal = :tanggal
                 WHERE k.status = 1 AND a.id_absensi IS NULL
             """),
-            {"today": today}  # Menggunakan parameter binding untuk mencegah SQL injection
+            {"tanggal": tanggal}
         )
         
-        # Mengonversi hasil menjadi daftar dictionary
-        absensi_list = [dict(row) for row in result.mappings()]  # Mengonversi hasil ke dalam format dictionary
+        absensi_list = [dict(row) for row in result.mappings()]
         return absensi_list
     except SQLAlchemyError as e:
-        print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
-        return []  # Mengembalikan daftar kosong jika terjadi kesalahan
-
+        print(f"Error occurred: {str(e)}")
+        return []
 
 '''<--- Query untuk Login --->'''
 def get_login_karyawan(username, password):
     try:
-        # Menggunakan query untuk memverifikasi username dan password
+        # Cek login berdasarkan username dan password
         result = connection.execute(
             text("""
                 SELECT k.id_karyawan, k.username, k.password, j.jenis, k.nama, k.status
-                FROM Karyawan k INNER JOIN jeniskaryawan j
-                ON k.id_jenis = j.id_jenis
-                WHERE username = :username
-                AND password = :password
+                FROM Karyawan k
+                INNER JOIN JenisKaryawan j ON k.id_jenis = j.id_jenis
+                WHERE k.username = :username
+                AND k.password = :password
                 AND k.status = 1;
             """),
-            {
-                "username": username,
-                "password": password
-            }
+            {"username": username, "password": password}
         ).mappings().fetchone()
+
+        # Jika tidak ditemukan, coba cek dengan token sebagai fallback
+        if not result:
+            result = connection.execute(
+                text("""
+                    SELECT k.id_karyawan, k.username, k.token, j.jenis, k.nama, k.status
+                    FROM Karyawan k
+                    INNER JOIN JenisKaryawan j ON k.id_jenis = j.id_jenis
+                    WHERE k.username = :username
+                    AND k.token = :token
+                    AND k.status = 1;
+                """),
+                {"username": username, "token": password}  # pakai 'password' sebagai input untuk token juga
+            ).mappings().fetchone()
 
         if not result:
             return None
-            
+
         access_token = create_access_token(identity=str(result['id_karyawan']))
         return {
             'access_token': access_token,
             'message': 'login success',
             'id_karyawan': result['id_karyawan'],
             'jenis': result['jenis'],
-            'nama': result['nama']}
+            'nama': result['nama']
+        }
     except SQLAlchemyError as e:
-        print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
+        print(f"Error occurred: {str(e)}")  # Log kesalahan
         return {'msg': 'Internal server error'}
     
 def get_login_admin(username, password):
     try:
-        # Menggunakan query untuk memverifikasi username dan password
+        # Cek login berdasarkan username dan password
         result = connection.execute(
             text("""
                 SELECT id_admin, nama, username, password, status
@@ -368,23 +376,35 @@ def get_login_admin(username, password):
                 AND password = :password
                 AND status = 1;
             """),
-            {
-                "username": username,
-                "password": password
-            }
+            {"username": username, "password": password}
         ).mappings().fetchone()
+
+        # Jika tidak ditemukan, coba cek dengan token
+        if not result:
+            result = connection.execute(
+                text("""
+                    SELECT id_admin, nama, username, token, status
+                    FROM Admin
+                    WHERE username = :username
+                    AND token = :token
+                    AND status = 1;
+                """),
+                {"username": username, "token": password}
+            ).mappings().fetchone()
 
         if not result:
             return None
-            
+
         access_token = create_access_token(identity=str(result['id_admin']))
         return {
             'access_token': access_token,
             'message': 'login success',
             'id_admin': result['id_admin'],
-            'nama': result['nama']}
+            'nama': result['nama']
+        }
+
     except SQLAlchemyError as e:
-        print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
+        print(f"Error occurred: {str(e)}")  # Log kesalahan
         return {'msg': 'Internal server error'}
     
 
@@ -479,3 +499,35 @@ def remove_abseni(id_abseni):
         connection.rollback()  # Rollback jika terjadi kesalahan
         print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
         return None  # Mengembalikan None atau bisa juga mengangkat exception
+    
+
+"""<-- Query Rekapan.py -->"""
+def get_rekap_absensi(start_date, end_date):
+    try:
+        query = text("""
+            SELECT 
+                k.id_karyawan,
+                k.nama,
+                k.gaji_pokok,
+                SUM(a.jam_terlambat) AS total_jam_terlambat,
+                SUM(a.jam_kurang) AS total_jam_kurang,
+                12480 AS total_jam_kerja_normal,
+                SUM(a.total_jam_kerja) AS total_jam_kerja,
+                COUNT(sp.nama_status) FILTER (WHERE sp.nama_status = 'Hadir') AS jumlah_hadir,
+                COUNT(sp.nama_status) FILTER (WHERE sp.nama_status = 'Tidak Hadir') AS jumlah_alpha,
+                COUNT(sp.nama_status) FILTER (WHERE sp.nama_status = 'Setengah Hari') AS jumlah_setengah_hari,
+                COUNT(sp.nama_status) FILTER (WHERE sp.nama_status = 'Izin') AS jumlah_izin,
+                COUNT(sp.nama_status) FILTER (WHERE sp.nama_status = 'Sakit') AS jumlah_sakit,
+                COUNT(sp.nama_status) FILTER (WHERE sp.nama_status = 'Dinas Luar') AS dinas_luar
+            FROM absensi a
+            JOIN karyawan k ON a.id_karyawan = k.id_karyawan
+            LEFT JOIN statuspresensi sp ON a.id_status = sp.id_status
+            WHERE a.tanggal BETWEEN :start_date AND :end_date
+            GROUP BY k.id_karyawan, k.nama, k.gaji_pokok
+            ORDER BY k.nama
+        """)
+        result = connection.execute(query, {'start_date': start_date, 'end_date': end_date})
+        return [dict(row) for row in result.mappings()]
+    except Exception as e:
+        print(f"Query Error: {str(e)}")
+        return []

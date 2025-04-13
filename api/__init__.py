@@ -8,6 +8,7 @@ from .karyawan import karyawan_bp
 from .absensi import absensi_bp
 from .autentikasi import autentikasi_bp
 from .cek_presensi import cek_presensi_bp
+from .rekapan import rekapan_bp
 from .blacklist_store import is_blacklisted
 
 
@@ -24,6 +25,7 @@ api.register_blueprint(karyawan_bp, name='karyawan')
 api.register_blueprint(absensi_bp, name='absensi')
 api.register_blueprint(autentikasi_bp, name='autentikasi')
 api.register_blueprint(cek_presensi_bp, name='cek_presensi')
+api.register_blueprint(rekapan_bp, name='rekapan')
 
 
 jwt = JWTManager(api)

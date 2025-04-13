@@ -164,7 +164,17 @@ def check_out(id_karyawan):
 @absensi_bp.route('/absensi/hadir', methods=['GET'])
 @jwt_required()
 def absensi():
-    list_absensi = get_list_absensi()
+    tanggal_param = request.args.get('tanggal')  # Ambil query param ?tanggal=DD-MM-YYYY
+
+    try:
+        if tanggal_param:
+            tanggal_filter = datetime.strptime(tanggal_param, "%d-%m-%Y").date()
+        else:
+            tanggal_filter, _ = get_timezone()  # default: hari ini
+    except ValueError:
+        return {'status': 'Format tanggal tidak valid. Gunakan DD-MM-YYYY'}, 400
+
+    list_absensi = get_list_absensi(tanggal_filter)
     result = [{
         'id': index + 1,
         'id_absensi': row['id_absensi'],
@@ -174,26 +184,38 @@ def absensi():
         'jenis': row['jenis'],
         'tanggal': row['tanggal'].strftime("%d-%m-%Y"),
         'jam_masuk': row['jam_masuk'].strftime('%H:%M') if row['jam_masuk'] else None,
-        'jam_keluar': row['jam_keluar'].strftime('%H:%M') if row['jam_keluar'] else None,  # Menangani jam_keluar yang None
+        'jam_keluar': row['jam_keluar'].strftime('%H:%M') if row['jam_keluar'] else None,
+        'jam_terlambat': row['jam_terlambat'],
+        'jam_kurang': row['jam_kurang'],
+        'total_jam_kerja': row['total_jam_kerja'],
         'lokasi_masuk': row['lokasi_masuk'] if row['lokasi_masuk'] else None,
         'lokasi_keluar': row['lokasi_keluar'] if row['lokasi_keluar'] else None,
+        'id_presensi': row['id_presensi'],
+        'status_presensi': row['status_presensi'],
         'status_absen': (
             'Belum Check-in' if row['jam_masuk'] is None else
             'Belum Check-out' if row['jam_keluar'] is None else
             'Selesai bekerja'
-        ),
-        'id_presensi': row['id_presensi'],
-        'status_presensi': row['status_presensi'],
-        'jam_terlambat': row['jam_terlambat'],
-        'total_jam_kerja': row['total_jam_kerja']
+        )
     } for index, row in enumerate(list_absensi)]
     
-    return {'absensi': result}, 200  # Mengembalikan hasil dalam format JSON
+    return {'absensi': result}, 200
 
 @absensi_bp.route('/absensi/tidak_hadir', methods=['GET'])
 @jwt_required()
 def absensi_tidak_hadir():
-    list_tidak_hadir = get_list_tidak_hadir()
+    tanggal_param = request.args.get('tanggal')  # Ambil query param ?tanggal=DD-MM-YYYY
+
+    try:
+        if tanggal_param:
+            tanggal_filter = datetime.strptime(tanggal_param, "%d-%m-%Y").date()
+        else:
+            tanggal_filter, _ = get_timezone()
+    except ValueError:
+        return {'status': 'Format tanggal tidak valid. Gunakan DD-MM-YYYY'}, 400
+
+    list_tidak_hadir = get_list_tidak_hadir(tanggal_filter)
+
     result = [{
         "id": index + 1,
         "id_karyawan": row["id_karyawan"],
@@ -204,7 +226,7 @@ def absensi_tidak_hadir():
         "status_absen": "Tanpa Keterangan"
     } for index, row in enumerate(list_tidak_hadir)]
     
-    return {'absensi': result}, 200  # Mengembalikan hasil dalam format JSON
+    return {'absensi': result}, 200
 
 @absensi_bp.route('/absensi/edit/<int:id_absensi>', methods=['PUT'])
 @jwt_required()
