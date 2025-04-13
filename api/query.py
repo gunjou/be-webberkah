@@ -83,7 +83,7 @@ def get_list_karyawan():
     try:
         # Menjalankan query untuk mendapatkan daftar karyawan
         result = connection.execute(
-            text("""SELECT k.id_karyawan, k.id_jenis, j.jenis, k.nama, k.gaji_pokok, k.username, k.password 
+            text("""SELECT k.id_karyawan, k.id_jenis, j.jenis, k.nama, k.gaji_pokok, k.username, k.token 
                 FROM Karyawan k 
                 INNER JOIN JenisKaryawan j ON k.id_jenis = j.id_jenis 
                 WHERE k.status = 1 AND j.jenis != 'direktur';""")
@@ -112,21 +112,21 @@ def get_karyawan(id):
         print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
         return None  # Mengembalikan None jika terjadi kesalahan
 
-def add_karyawan(jenis, nama, gaji_pokok, username, password):
+def add_karyawan(jenis, nama, gaji_pokok, username, token):
     # Kedepannya akan menggunakan Hash password sebelum menyimpannya
     # hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
 
     try:
         # Menggunakan parameter binding untuk keamanan
         result = connection.execute(
-            text("""INSERT INTO Karyawan (id_jenis, nama, gaji_pokok, username, password, status) 
-                     VALUES (:jenis, :nama, :gaji_pokok, :username, :password, 1)"""),
+            text("""INSERT INTO Karyawan (id_jenis, nama, gaji_pokok, username, token, status) 
+                     VALUES (:jenis, :nama, :gaji_pokok, :username, :token, 1)"""),
             {
                 "jenis": jenis,
                 "nama": nama,
                 "gaji_pokok": gaji_pokok,
                 "username": username,
-                "password": password
+                "token": token
             }
         )
         
@@ -140,7 +140,7 @@ def add_karyawan(jenis, nama, gaji_pokok, username, password):
         print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
         return None  # Mengembalikan None atau bisa juga mengangkat exception
 
-def update_karyawan(id_emp, jenis, nama, gaji_pokok, username, password):
+def update_karyawan(id_emp, jenis, nama, gaji_pokok, username, token):
     try:
         # Menyiapkan query untuk update
         result = connection.execute(
@@ -150,7 +150,7 @@ def update_karyawan(id_emp, jenis, nama, gaji_pokok, username, password):
                     nama = :nama, 
                     gaji_pokok = :gaji_pokok, 
                     username = :username, 
-                    password = :password, 
+                    token = :token, 
                     updated_at = CURRENT_TIMESTAMP 
                 WHERE id_karyawan = :id_emp
             """),
@@ -159,7 +159,7 @@ def update_karyawan(id_emp, jenis, nama, gaji_pokok, username, password):
                 "nama": nama,
                 "gaji_pokok": gaji_pokok,
                 "username": username,
-                "password": password,  # Menggunakan password yang diberikan
+                "token": token,  # Menggunakan password yang diberikan
                 "id_emp": id_emp
             }
         )

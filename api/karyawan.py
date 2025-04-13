@@ -47,12 +47,12 @@ def tambah_karyawan():
     nama = data.get('nama')
     gaji_pokok = data.get('gaji_pokok')
     username = data.get('username')
-    password = data.get('password')
+    token = data.get('token')
 
-    if not all([jenis, nama, gaji_pokok, username, password]):
+    if not all([jenis, nama, gaji_pokok, username, token]):
         return {'status': "Semua kolom harus diisi"}, 400  # Bad Request
 
-    karyawan_id = add_karyawan(jenis, nama, gaji_pokok, username, password)
+    karyawan_id = add_karyawan(jenis, nama, gaji_pokok, username, token)
     
     if karyawan_id is None:
         return {'status': "Gagal menambahkan karyawan"}, 500  # Internal Server Error
@@ -73,7 +73,7 @@ def edit_karyawan(id):
     nama = request.json.get("nama", None)
     gaji_pokok = request.json.get("gaji_pokok", None)
     username = request.json.get("username", None)
-    password = request.json.get("password", None)
+    token = request.json.get("token", None)
 
     # Perbarui data jika ada input baru
     if jenis is not None:
@@ -84,8 +84,8 @@ def edit_karyawan(id):
         karyawan['gaji_pokok'] = gaji_pokok
     if username is not None:
         karyawan['username'] = username
-    if password is not None:
-        karyawan['password'] = password
+    if token is not None:
+        karyawan['token'] = token
 
     result = update_karyawan(
         karyawan['id_karyawan'],
@@ -93,7 +93,7 @@ def edit_karyawan(id):
         karyawan['nama'],
         karyawan['gaji_pokok'],
         karyawan['username'],
-        karyawan['password']
+        karyawan['token']
     )
     
     if result is None or result == 0:
