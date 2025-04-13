@@ -509,6 +509,10 @@ def get_rekap_absensi(start_date, end_date):
                 k.id_karyawan,
                 k.nama,
                 k.gaji_pokok,
+                k.id_jenis,
+                jk.jenis,
+                k.id_tipe,
+                tk.tipe,
                 SUM(a.jam_terlambat) AS total_jam_terlambat,
                 SUM(a.jam_kurang) AS total_jam_kurang,
                 12480 AS total_jam_kerja_normal,
@@ -522,9 +526,14 @@ def get_rekap_absensi(start_date, end_date):
             FROM absensi a
             JOIN karyawan k ON a.id_karyawan = k.id_karyawan
             LEFT JOIN statuspresensi sp ON a.id_status = sp.id_status
+            LEFT JOIN jeniskaryawan jk ON k.id_jenis = jk.id_jenis
+            LEFT JOIN tipekaryawan tk ON k.id_tipe = tk.id_tipe
             WHERE a.tanggal BETWEEN :start_date AND :end_date
-            GROUP BY k.id_karyawan, k.nama, k.gaji_pokok
-            ORDER BY k.nama
+            GROUP BY 
+                k.id_karyawan, k.nama, k.gaji_pokok, 
+                k.id_jenis, jk.jenis, 
+                k.id_tipe, tk.tipe
+            ORDER BY k.nama;
         """)
         result = connection.execute(query, {'start_date': start_date, 'end_date': end_date})
         return [dict(row) for row in result.mappings()]
