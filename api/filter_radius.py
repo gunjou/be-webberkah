@@ -1,15 +1,12 @@
 from math import radians, sin, cos, sqrt, atan2
 
-
-# Daftar lokasi kantor dengan nama
+# Daftar lokasi kantor dengan radius masing-masing
 OFFICE_LOCATIONS = [
-    {"name": "Kantor Perampuan", "lat": -8.639211414577346, "lon": 116.08763439302037},
-    {"name": "Gudang GM", "lat": -8.674641, "lon": 116.086079},
-    {"name": "Rumah", "lat": -8.639975671029253, "lon": 116.0940286392315},
-    {"name": "PLTG Jeranjang", "lat": -8.659710078427981, "lon": 116.07416334995118}
+    {"name": "Kantor Perampuan", "lat": -8.639211414577346, "lon": 116.08763439302037, "radius": 50},
+    {"name": "Gudang GM", "lat": -8.674641, "lon": 116.086079, "radius": 50},
+    {"name": "Rumah", "lat": -8.639975671029253, "lon": 116.0940286392315, "radius": 50},
+    {"name": "PLTG Jeranjang", "lat": -8.659710078427981, "lon": 116.07416334995118, "radius": 150}  # radius lebih besar
 ]
-
-RADIUS_ALLOWED = 50  # Radius dalam meter
 
 def calculate_distance(lat1, lon1, lat2, lon2):
     """Menghitung jarak antara dua titik koordinat menggunakan Haversine Formula"""
@@ -25,6 +22,7 @@ def calculate_distance(lat1, lon1, lat2, lon2):
 def get_valid_office_name(user_lat, user_lon):
     for office in OFFICE_LOCATIONS:
         distance = calculate_distance(user_lat, user_lon, office["lat"], office["lon"])
-        if distance <= RADIUS_ALLOWED:
-            return office["name"]  # Langsung return nama lokasi yang cocok
+        allowed_radius = office.get("radius", 50)  # fallback default radius 50
+        if distance <= allowed_radius:
+            return office["name"]
     return None  # Tidak ada lokasi yang cocok

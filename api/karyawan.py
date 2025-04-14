@@ -3,18 +3,20 @@ from flask_jwt_extended import jwt_required
 from sqlalchemy.exc import SQLAlchemyError
 
 from .query import get_list_jenis, get_list_karyawan, add_jenis, add_karyawan, update_karyawan, remove_karyawan, get_karyawan
-
+from .decorator import role_required
 
 karyawan_bp = Blueprint('api', __name__)
 
 '''<--- Table Jenis Karyawan --->'''
 @karyawan_bp.route('/jenis', methods=['GET'])
+# @role_required('admin')
 def list_jenis():
     jenis_list = get_list_jenis()
     return {'jenis_karyawan': jenis_list}, 200  # OK
 
 
 @karyawan_bp.route('/jenis', methods=['POST'])
+@role_required('admin')
 def tambah_jenis():
     jenis = request.json.get("jenis", None)
 
@@ -32,7 +34,7 @@ def tambah_jenis():
 
 '''<--- Table Karyawan --->'''
 @karyawan_bp.route('/karyawan', methods=['GET'])
-@jwt_required()
+@role_required('admin')
 def list_karyawan():
     karyawan_list = get_list_karyawan()  # Tidak perlu memanggil fetchall()
     
@@ -40,7 +42,7 @@ def list_karyawan():
     return {'karyawan': karyawan_list}, 200
 
 @karyawan_bp.route('/karyawan', methods=['POST'])
-@jwt_required()
+@role_required('admin')
 def tambah_karyawan():
     data = request.json
     jenis = data.get('jenis')
@@ -61,7 +63,7 @@ def tambah_karyawan():
 
 
 @karyawan_bp.route('/karyawan/<int:id>', methods=['PUT'])
-@jwt_required()
+@role_required('admin')
 def edit_karyawan(id):
     karyawan = get_karyawan(id)
 
@@ -103,7 +105,7 @@ def edit_karyawan(id):
 
 
 @karyawan_bp.route('/karyawan/delete/<int:id>', methods=['PUT'])
-@jwt_required()
+@role_required('admin')
 def delete_karyawan(id):
     karyawan = get_karyawan(id)
 

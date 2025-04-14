@@ -354,8 +354,8 @@ def get_login_karyawan(username, password):
 
         if not result:
             return None
-
-        access_token = create_access_token(identity=str(result['id_karyawan']))
+        
+        access_token = create_access_token(identity=str(result['id_karyawan']), additional_claims={"role": 'karyawan'})
         return {
             'access_token': access_token,
             'message': 'login success',
@@ -397,7 +397,7 @@ def get_login_admin(username, password):
         if not result:
             return None
 
-        access_token = create_access_token(identity=str(result['id_admin']))
+        access_token = create_access_token(identity=str(result['id_admin']), additional_claims={"role": 'admin'})
         return {
             'access_token': access_token,
             'message': 'login success',

@@ -3,6 +3,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from flask_jwt_extended import jwt_required, get_jwt
 
 from .query import get_login_karyawan, get_login_admin
+from .decorator import role_required
 from .blacklist_store import blacklist
 
 
@@ -36,7 +37,7 @@ def login_karyawan():
         return {'status': "Internal server error"}, 500  # Internal Server Error
 
 @autentikasi_bp.route('/logout/karyawan', methods=['POST'])
-@jwt_required()  # Ensure the user is authenticated
+@role_required('karyawan')
 def logout_karyawan():
     jti = request.json.get('jti')
     if jti:
@@ -67,7 +68,7 @@ def login_admin():
         return {'status': "Internal server error"}, 500  # Internal Server Error
 
 @autentikasi_bp.route('/logout/admin', methods=['POST'])
-@jwt_required()  # Ensure the user is authenticated
+@role_required('admin')
 def logout_admin():
     # In a simple implementation, you can just return a success message
     return {'status': "Successfully logged out"}, 200  # OK

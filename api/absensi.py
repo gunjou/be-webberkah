@@ -1,17 +1,16 @@
 from flask import Blueprint, jsonify, request
-from flask_jwt_extended import jwt_required
-import pytz
 from datetime import date, datetime, time
+import pytz
 import re
 
 from .config import get_timezone
+from .decorator import role_required
 from .query import get_list_absensi, add_checkin, update_checkout, get_list_tidak_hadir, get_check_presensi, update_absensi_times, remove_abseni
 from .face_detection import verifikasi_wajah
 from .filter_radius import get_valid_office_name
 
 
 absensi_bp = Blueprint('api', __name__)
-
 
 def hitung_waktu_kerja(jam_masuk, jam_keluar):
     if jam_keluar is None:
@@ -22,7 +21,6 @@ def hitung_waktu_kerja(jam_masuk, jam_keluar):
 
     selisih = total_keluar - total_masuk
     return max(selisih, 0)  # Hindari nilai negatif jika jam_keluar lebih kecil (data tidak valid)
-
 
 def hitung_keterlambatan(jam_masuk):
     wita = pytz.timezone("Asia/Makassar")
@@ -39,7 +37,6 @@ def hitung_keterlambatan(jam_masuk):
     # Hitung selisih menit
     terlambat = (jam_masuk.hour * 60 + jam_masuk.minute) - (jam_masuk_batas.hour * 60 + jam_masuk_batas.minute)
     return terlambat
-
 
 def hitung_jam_kurang(jam_keluar):
     """
@@ -63,7 +60,7 @@ def hitung_jam_kurang(jam_keluar):
 
 """<-- API Check in & Check out -->"""
 @absensi_bp.route('/absensi/<int:id_karyawan>', methods=['POST'])
-@jwt_required()
+@role_required('karyawan')
 def check_in(id_karyawan):
     # Periksa apakah file gambar ada dalam request
     if 'file' not in request.files:
@@ -117,7 +114,7 @@ def check_in(id_karyawan):
     return jsonify({'status': 'Check-in succeeded', 'lokasi': lokasi_absensi}), 200
 
 @absensi_bp.route('/absensi/<int:id_karyawan>', methods=['PUT'])
-@jwt_required()
+@role_required('karyawan')
 def check_out(id_karyawan):
     # Periksa apakah file gambar ada dalam request
     if 'file' not in request.files:
@@ -183,7 +180,7 @@ def check_out(id_karyawan):
 
 """<-- Get Presensi -->"""
 @absensi_bp.route('/absensi/hadir', methods=['GET'])
-@jwt_required()
+@role_required('admin')
 def absensi():
     tanggal_param = request.args.get('tanggal')  # Ambil query param ?tanggal=DD-MM-YYYY
 
@@ -223,7 +220,7 @@ def absensi():
     return {'absensi': result}, 200
 
 @absensi_bp.route('/absensi/tidak_hadir', methods=['GET'])
-@jwt_required()
+@role_required('admin')
 def absensi_tidak_hadir():
     tanggal_param = request.args.get('tanggal')  # Ambil query param ?tanggal=DD-MM-YYYY
 
@@ -250,7 +247,7 @@ def absensi_tidak_hadir():
     return {'absensi': result}, 200
 
 @absensi_bp.route('/absensi/edit/<int:id_absensi>', methods=['PUT'])
-@jwt_required()
+@role_required('admin')
 def edit_absensi(id_absensi):
     data = request.json
     jam_masuk = data.get("jam_masuk")
@@ -290,7 +287,7 @@ def edit_absensi(id_absensi):
     return {'status': 'Data absensi berhasil diperbarui'}, 200
 
 @absensi_bp.route('/absensi/delete/<int:id_absensi>', methods=['PUT'])
-@jwt_required()
+@role_required('admin')
 def delete_absensi(id_absensi):
     try:
         result = remove_abseni(id_absensi)

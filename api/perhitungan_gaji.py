@@ -2,12 +2,15 @@ from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
 from datetime import datetime, date
 import calendar
+
 from .query import get_rekap_absensi
+from .decorator import role_required
+
 
 perhitungan_gaji_bp = Blueprint('perhitungan_gaji', __name__)
 
 @perhitungan_gaji_bp.route('/rekapan_gaji', methods=['GET'])
-@jwt_required()
+@role_required('admin')
 def rekap_gaji():
     start_param = request.args.get('start')
     end_param = request.args.get('end')

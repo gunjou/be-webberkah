@@ -2,12 +2,15 @@ from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
 from datetime import datetime, date, timedelta
 import calendar
+
 from .query import get_rekap_absensi
+from .decorator import role_required
+
 
 rekapan_bp = Blueprint('rekapan', __name__)
 
 @rekapan_bp.route('/rekapan/absensi', methods=['GET'])
-@jwt_required()
+@role_required('admin')
 def rekap_absensi():
     start_param = request.args.get('start')
     end_param = request.args.get('end')
