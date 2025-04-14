@@ -41,21 +41,27 @@ def hitung_keterlambatan(jam_masuk):
 def hitung_jam_kurang(jam_keluar):
     """
     Menghitung jumlah menit kekurangan jam kerja jika checkout sebelum jam 17:00.
-    :param jam_keluar_str: string format "HH:MM:SS"
+    :param jam_keluar: string format "HH:MM:SS" atau datetime.time
     :return: int (jumlah menit) atau None jika tidak ada kekurangan
     """
     waktu_ideal_pulang = time(17, 0)  # 17:00:00
 
-    try:
-        jam_keluar_obj = datetime.strptime(jam_keluar, "%H:%M:%S").time()
-    except ValueError:
-        return None  # Jika format waktu tidak valid
+    # Deteksi dan konversi string jika diperlukan
+    if isinstance(jam_keluar, str):
+        try:
+            jam_keluar_obj = datetime.strptime(jam_keluar, "%H:%M:%S").time()
+        except ValueError:
+            return None  # Format waktu tidak valid
+    elif isinstance(jam_keluar, time):
+        jam_keluar_obj = jam_keluar
+    else:
+        return None  # Tipe data tidak didukung
 
     if jam_keluar_obj < waktu_ideal_pulang:
         delta = datetime.combine(date.today(), waktu_ideal_pulang) - datetime.combine(date.today(), jam_keluar_obj)
         return int(delta.total_seconds() // 60)
     
-    return None  # Jika checkout >= 17:00
+    return None  # Tidak ada kekurangan
 
 
 """<-- API Check in & Check out -->"""
