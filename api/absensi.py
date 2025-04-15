@@ -273,6 +273,7 @@ def edit_absensi(id_absensi):
     # Jika jam_keluar berupa string kosong, perlakukan sebagai None
     if jam_keluar == "" or jam_keluar == None:
         jam_keluar = None
+        jam_kurang = None
         total_jam_kerja = None
     else:
         total_jam_kerja = hitung_waktu_kerja(
