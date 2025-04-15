@@ -5,7 +5,7 @@ OFFICE_LOCATIONS = [
     {"name": "Kantor Perampuan", "lat": -8.639211414577346, "lon": 116.08763439302037, "radius": 50},
     {"name": "Gudang GM", "lat": -8.674641, "lon": 116.086079, "radius": 50},
     {"name": "Rumah", "lat": -8.639975671029253, "lon": 116.0940286392315, "radius": 50},
-    {"name": "PLTG Jeranjang", "lat": -8.659710078427981, "lon": 116.07416334995118, "radius": 150}  # radius lebih besar
+    {"name": "PLTG Jeranjang", "lat": -8.659109142146225, "lon": 116.07298164266732, "radius": 300}  # radius lebih besar
 ]
 
 def calculate_distance(lat1, lon1, lat2, lon2):

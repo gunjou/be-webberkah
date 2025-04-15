@@ -292,7 +292,7 @@ def edit_absensi(id_absensi):
 
     return {'status': 'Data absensi berhasil diperbarui'}, 200
 
-@absensi_bp.route('/absensi/delete/<int:id_absensi>', methods=['PUT'])
+@absensi_bp.route('/absensi/delete/<int:id_absensi>', methods=['DELETE'])
 @role_required('admin')
 def delete_absensi(id_absensi):
     try:
