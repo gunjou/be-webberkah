@@ -280,7 +280,7 @@ def edit_absensi(id_absensi):
             datetime.strptime(jam_masuk, "%H:%M").time(),
             datetime.strptime(jam_keluar, "%H:%M").time()
         )
-        jam_kurang = hitung_jam_kurang(jam_keluar)
+        jam_kurang = hitung_jam_kurang(datetime.strptime(jam_keluar, "%H:%M").time())
 
     jam_terlambat = hitung_keterlambatan(datetime.strptime(jam_masuk, "%H:%M").time())
 
