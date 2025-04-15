@@ -271,7 +271,7 @@ def edit_absensi(id_absensi):
         return {'status': 'Format jam keluar tidak valid. Gunakan format HH:MM'}, 400
 
     # Jika jam_keluar berupa string kosong, perlakukan sebagai None
-    if jam_keluar == "":
+    if jam_keluar == "" or jam_keluar == None:
         jam_keluar = None
         total_jam_kerja = None
     else:
