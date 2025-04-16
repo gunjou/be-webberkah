@@ -194,7 +194,7 @@ def remove_karyawan(id_emp):
 
 
 '''<--- Query untuk Table Absensi --->'''
-def add_checkin(id_karyawan, tanggal, jam_masuk, lokasi_absensi, jam_terlambat):
+def add_checkin(id_karyawan, tanggal, jam_masuk, lokasi_absensi, jam_terlambat): # /absen karyawan
     datetime_now = get_datetime_now()
     try:
         result = connection.execute(
@@ -232,7 +232,7 @@ def add_checkin(id_karyawan, tanggal, jam_masuk, lokasi_absensi, jam_terlambat):
         print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
         return None  # Mengembalikan None jika terjadi kesalahan
 
-def update_checkout(id_karyawan, tanggal, jam_keluar, lokasi_absensi, jam_kurang, total_jam_kerja):
+def update_checkout(id_karyawan, tanggal, jam_keluar, lokasi_absensi, jam_kurang, total_jam_kerja): # /absen karyawan
     datetime_now = get_datetime_now()
     try:
         result = connection.execute(
@@ -263,7 +263,30 @@ def update_checkout(id_karyawan, tanggal, jam_keluar, lokasi_absensi, jam_kurang
         connection.rollback()  # Rollback jika terjadi kesalahan
         print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
         return None  # Mengembalikan None jika terjadi kesalahan
-    
+
+def hapus_absen_keluar(id_absensi): # /absen karyawan
+    try:
+        query = text("""
+            UPDATE Absensi
+            SET jam_keluar = NULL,
+                jam_kurang = NULL,
+                lokasi_keluar = NULL,
+                total_jam_kerja = NULL,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id_absensi = :id_absensi AND status = 1
+        """)
+        params = {
+            'id_absensi': id_absensi
+        }
+
+        result = connection.execute(query, params)
+        connection.commit()
+
+        return result.rowcount  # Kembalikan jumlah baris yang diubah
+    except SQLAlchemyError as e:
+        print(f"Update Absensi Error: {str(e)}")
+        return None
+
 def get_list_absensi(tanggal):
     try:
         result = connection.execute(
@@ -417,7 +440,7 @@ def get_check_presensi(id_karyawan):
     try:
         result = connection.execute(
             text("""
-                SELECT tanggal, jam_masuk, jam_keluar, lokasi_masuk, lokasi_keluar, jam_terlambat
+                SELECT id_absensi, tanggal, jam_masuk, jam_keluar, lokasi_masuk, lokasi_keluar, jam_terlambat
                 FROM Absensi 
                 WHERE id_karyawan = :id_karyawan
                 AND tanggal = :today
@@ -465,9 +488,10 @@ def update_absensi_times(id_absensi, jam_masuk, jam_keluar, jam_terlambat, jam_k
             query = text("""
                 UPDATE Absensi
                 SET jam_masuk = :jam_masuk,
-                    jam_keluar = NULL,
-                    lokasi_keluar = NULL,
                     jam_terlambat = :jam_terlambat,
+                    jam_keluar = NULL,
+                    jam_kurang = NULL,
+                    lokasi_keluar = NULL,
                     total_jam_kerja = NULL,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id_absensi = :id_absensi AND status = 1

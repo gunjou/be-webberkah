@@ -5,7 +5,7 @@ import re
 
 from .config import get_timezone
 from .decorator import role_required
-from .query import get_list_absensi, add_checkin, update_checkout, get_list_tidak_hadir, get_check_presensi, update_absensi_times, remove_abseni
+from .query import get_list_absensi, add_checkin, hapus_absen_keluar, update_checkout, get_list_tidak_hadir, get_check_presensi, update_absensi_times, remove_abseni
 from .face_detection import verifikasi_wajah
 from .filter_radius import get_valid_office_name
 
@@ -183,6 +183,17 @@ def check_out(id_karyawan):
     
     return jsonify({'status': 'Absen pulang berhasil', 'lokasi': lokasi_absensi}), 200
 
+@absensi_bp.route('/absensi/delete_jam_masuk/<int:id_absensi>', methods=['PUT'])
+@role_required('karyawan')
+def hapus_absen_terlanjur_keluar(id_absensi):
+    try:
+        result = hapus_absen_keluar(id_absensi)
+        if result is None or result == 0:
+            return {'status': "Gagal menghapus jam keluar"}, 500
+        return {'status': "Berhasil menghapus jam keluar"}, 200
+    except Exception as e:
+        return {'status': f"Terjadi kesalahan: {str(e)}"}, 500
+    
 
 """<-- Get Presensi -->"""
 @absensi_bp.route('/absensi/hadir', methods=['GET'])

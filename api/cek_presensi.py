@@ -15,6 +15,7 @@ def absensi(id_karyawan):
         return {"message": "Belum ada presensi"}, 200
 
     result = {
+        "id_absensi": cek_presensi["id_absensi"],
         "tanggal": cek_presensi["tanggal"],
         "jam_masuk": cek_presensi["jam_masuk"].strftime('%H:%M') if cek_presensi['jam_masuk'] else None,
         "jam_keluar": cek_presensi["jam_keluar"].strftime('%H:%M') if cek_presensi['jam_keluar'] else None,
