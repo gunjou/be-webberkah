@@ -5,7 +5,7 @@ import re
 
 from .config import get_timezone
 from .decorator import role_required
-from .query import get_list_absensi, add_checkin, hapus_absen_keluar, update_checkout, get_list_tidak_hadir, get_check_presensi, update_absensi_times, remove_abseni
+from .query import get_absensi_harian, get_list_absensi, add_checkin, hapus_absen_keluar, update_checkout, get_list_tidak_hadir, get_check_presensi, update_absensi_times, remove_abseni
 from .face_detection import verifikasi_wajah
 from .filter_radius import get_valid_office_name
 
@@ -193,6 +193,72 @@ def hapus_absen_terlanjur_keluar(id_absensi):
         return {'status': "Berhasil menghapus jam keluar"}, 200
     except Exception as e:
         return {'status': f"Terjadi kesalahan: {str(e)}"}, 500
+    
+@absensi_bp.route('/absensi/history/<int:id_karyawan>', methods=['GET'])
+@role_required('karyawan')
+def absensi_harian_personal(id_karyawan):
+    tanggal_param = request.args.get('tanggal')  # Ambil query param ?tanggal=DD-MM-YYYY
+
+    try:
+        if tanggal_param:
+            tanggal_filter = datetime.strptime(tanggal_param, "%d-%m-%Y").date()
+        else:
+            tanggal_filter, _ = get_timezone()  # default: hari ini
+    except ValueError:
+        return {'status': 'Format tanggal tidak valid. Gunakan DD-MM-YYYY'}, 400
+
+    absensi_harian = get_absensi_harian(id_karyawan, tanggal_filter)
+    result = []
+
+    JAM_ISTIRAHAT = 60  # 1 jam istirahat dalam menit
+    BATAS_MAKS_MENIT_PER_HARI = 480  # 8 jam kerja efektif per hari
+
+    for row in absensi_harian:
+        # Konversi nilai-nilai nullable ke default agar tidak error saat dihitung
+        jam_terlambat = row['jam_terlambat'] or 0
+        jam_kurang_db = row['jam_kurang'] or 0
+        jam_bolos = jam_kurang_db
+        jam_kurang_total = jam_terlambat + jam_kurang_db
+        gaji_pokok = row['gaji_pokok']
+
+        # Hitung tarif per menit dan batas maksimal gaji harian
+        tarif_per_menit = gaji_pokok / 12480  # 26 hari x 8 jam x 60 menit = 12480 menit/bulan
+        gaji_maks_harian = tarif_per_menit * BATAS_MAKS_MENIT_PER_HARI
+        potongan = tarif_per_menit * jam_kurang_total
+
+        # Hitung waktu kerja efektif setelah dikurangi istirahat (jika ada jam keluar)
+        total_jam_kerja = row['total_jam_kerja'] or 0
+        waktu_kerja_efektif = max(0, total_jam_kerja - JAM_ISTIRAHAT)
+
+        if row['jam_keluar']:
+            total_gaji_harian = max(0, min(waktu_kerja_efektif, BATAS_MAKS_MENIT_PER_HARI) * tarif_per_menit - potongan)
+        else:
+            total_gaji_harian = 0
+
+        result.append({
+            'id_karyawan': row['id_karyawan'],
+            'nama': row['nama'],
+            'status_presensi': row.get('nama_status'),
+            'id_tipe': row['id_tipe'],
+            'tipe': row['tipe'],
+            'tanggal': row['tanggal'].strftime("%d-%m-%Y"),
+            'jam_masuk': row['jam_masuk'].strftime('%H:%M') if row['jam_masuk'] else None,
+            'jam_keluar': row['jam_keluar'].strftime('%H:%M') if row['jam_keluar'] else None,
+            'jam_terlambat': jam_terlambat,
+            'jam_bolos': jam_bolos,
+            'jam_kurang': jam_kurang_total,
+            'total_jam_kerja': total_jam_kerja,
+            'lokasi_masuk': row['lokasi_masuk'],
+            'lokasi_keluar': row['lokasi_keluar'],
+            'gaji_pokok': round(gaji_pokok),
+            'tarif_per_menit': round(tarif_per_menit),
+            'gaji_maks_harian': round(gaji_maks_harian),
+            'potongan': round(potongan),
+            'total_gaji_harian': round(total_gaji_harian),
+        })
+
+    return {'history': result}, 200
+
     
 
 """<-- Get Presensi -->"""

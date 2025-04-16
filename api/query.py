@@ -286,6 +286,41 @@ def hapus_absen_keluar(id_absensi): # /absen karyawan
     except SQLAlchemyError as e:
         print(f"Update Absensi Error: {str(e)}")
         return None
+    
+def get_absensi_harian(id_karyawan, tanggal):
+    try:
+        result = connection.execute(
+            text("""
+                SELECT a.id_karyawan,
+                    k.nama,
+                    s.id_status,
+                    s.nama_status,
+                    t.id_tipe,
+                    t.tipe,
+                    a.tanggal,
+                    a.jam_masuk,
+                    a.jam_keluar,
+                    a.jam_terlambat,
+                    a.jam_kurang,
+                    a.total_jam_kerja,
+                    a.lokasi_masuk,
+                    a.lokasi_keluar,
+                    k.gaji_pokok
+                FROM Absensi a 
+                INNER JOIN Karyawan k ON k.id_karyawan = a.id_karyawan 
+                INNER JOIN Jeniskaryawan j ON k.id_jenis = j.id_jenis 
+                INNER JOIN StatusPresensi s ON a.id_status = s.id_status 
+                INNER JOIN TipeKaryawan t ON k.id_tipe = t.id_tipe 
+                WHERE a.id_karyawan = :id_karyawan AND a.status = 1 AND a.tanggal = :tanggal;
+            """),
+            {"tanggal": tanggal, "id_karyawan": id_karyawan}
+        )
+
+        absensi_harian_list = [dict(row) for row in result.mappings()]
+        return absensi_harian_list
+    except SQLAlchemyError as e:
+        print(f"Error occurred: {str(e)}")
+        return []
 
 def get_list_absensi(tanggal):
     try:
