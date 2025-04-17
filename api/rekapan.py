@@ -3,7 +3,7 @@ from flask_jwt_extended import jwt_required
 from datetime import datetime, date, timedelta
 import calendar
 
-from .query import get_rekap_absensi
+from .query import get_list_rekapan_person, get_rekap_absensi
 from .decorator import role_required
 
 
@@ -55,4 +55,65 @@ def rekap_absensi():
         'tanggal_start': start.strftime("%d-%m-%Y"),
         'tanggal_end': end.strftime("%d-%m-%Y"),
         'rekap': data
+    }, 200
+
+
+from datetime import time
+
+def format_jam_menit(menit):
+    if menit is None:
+        return ""
+    jam = menit // 60
+    menit_sisa = menit % 60
+    parts = []
+    if jam > 0:
+        parts.append(f"{jam} jam")
+    if menit_sisa > 0:
+        parts.append(f"{menit_sisa} menit")
+    return " ".join(parts) if parts else "0 menit"
+
+
+@rekapan_bp.route('/list-rekapan-person', methods=['GET'])
+@role_required('karyawan')
+def rekap_absensi_person():
+    from flask_jwt_extended import get_jwt_identity
+    id_karyawan = get_jwt_identity()
+
+    start_param = request.args.get('start')
+    end_param = request.args.get('end')
+
+    try:
+        if start_param and end_param:
+            start = datetime.strptime(start_param, "%d-%m-%Y").date()
+            end = datetime.strptime(end_param, "%d-%m-%Y").date()
+        else:
+            today = date.today()
+            start = date(today.year, today.month, 1)
+            last_day = calendar.monthrange(today.year, today.month)[1]
+            end = min(today, date(today.year, today.month, last_day))
+    except ValueError:
+        return {'status': 'Format tanggal tidak valid. Gunakan format DD-MM-YYYY'}, 400
+
+    absensi_data = get_list_rekapan_person(start, end, id_karyawan)
+
+    if not absensi_data:
+        return {'status': 'Data absensi tidak ditemukan untuk karyawan ini'}, 404
+
+    for row in absensi_data:
+    # Format jam masuk & keluar
+        for field in ['jam_masuk', 'jam_keluar']:
+            if isinstance(row.get(field), time):
+                row[field] = row[field].strftime('%H:%M:%S')
+
+        # Format integer menit jadi "x jam y menit"
+        for field in ['jam_terlambat', 'jam_kurang', 'total_jam_kerja']:
+            val = row.get(field)
+            if isinstance(val, int):
+                row[field] = format_jam_menit(val)
+
+
+    return {
+        'tanggal_start': start.strftime("%d-%m-%Y"),
+        'tanggal_end': end.strftime("%d-%m-%Y"),
+        'data_absensi': absensi_data
     }, 200
