@@ -2,7 +2,7 @@ from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
 from sqlalchemy.exc import SQLAlchemyError
 
-from .query import get_list_jenis, get_list_karyawan, add_jenis, add_karyawan, update_karyawan, remove_karyawan, get_karyawan
+from .query import get_list_jenis, get_list_karyawan, add_jenis, add_karyawan, get_list_tipe, update_karyawan, remove_karyawan, get_karyawan
 from .decorator import role_required
 
 karyawan_bp = Blueprint('api', __name__)
@@ -31,6 +31,11 @@ def tambah_jenis():
     except SQLAlchemyError as e:
         return {'status': f"Gagal menambahkan data: {str(e)}"}, 500
 
+@karyawan_bp.route('/tipe', methods=['GET'])
+# @role_required('admin')
+def list_tipe():
+    tipe_list = get_list_tipe()
+    return {'tipe_karyawan': tipe_list}, 200  # OK
 
 '''<--- Table Karyawan --->'''
 @karyawan_bp.route('/karyawan', methods=['GET'])
@@ -46,15 +51,16 @@ def list_karyawan():
 def tambah_karyawan():
     data = request.json
     jenis = data.get('jenis')
+    tipe = data.get('tipe')
     nama = data.get('nama')
     gaji_pokok = data.get('gaji_pokok')
     username = data.get('username')
-    token = data.get('token')
+    kode_pemulihan = data.get('kode_pemulihan')
 
-    if not all([jenis, nama, gaji_pokok, username, token]):
+    if not all([jenis, tipe, nama, gaji_pokok, username, kode_pemulihan]):
         return {'status': "Semua kolom harus diisi"}, 400  # Bad Request
 
-    karyawan_id = add_karyawan(jenis, nama, gaji_pokok, username, token)
+    karyawan_id = add_karyawan(jenis, tipe, nama, gaji_pokok, username, kode_pemulihan)
     
     if karyawan_id is None:
         return {'status': "Gagal menambahkan karyawan"}, 500  # Internal Server Error
@@ -72,30 +78,34 @@ def edit_karyawan(id):
 
     # Ambil data dari request
     jenis = request.json.get("jenis", None)
+    tipe = request.json.get("tipe", None)
     nama = request.json.get("nama", None)
     gaji_pokok = request.json.get("gaji_pokok", None)
     username = request.json.get("username", None)
-    token = request.json.get("token", None)
+    kode_pemulihan = request.json.get("kode_pemulihan", None)
 
     # Perbarui data jika ada input baru
     if jenis is not None:
         karyawan['id_jenis'] = jenis
+    if tipe is not None:
+        karyawan['id_tipe'] = tipe
     if nama is not None:
         karyawan['nama'] = nama
     if gaji_pokok is not None:
         karyawan['gaji_pokok'] = gaji_pokok
     if username is not None:
         karyawan['username'] = username
-    if token is not None:
-        karyawan['token'] = token
+    if kode_pemulihan is not None:
+        karyawan['kode_pemulihan'] = kode_pemulihan
 
     result = update_karyawan(
         karyawan['id_karyawan'],
         karyawan['id_jenis'],
+        karyawan['id_tipe'],
         karyawan['nama'],
         karyawan['gaji_pokok'],
         karyawan['username'],
-        karyawan['token']
+        karyawan['kode_pemulihan']
     )
     
     if result is None or result == 0:

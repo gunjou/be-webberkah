@@ -77,15 +77,30 @@ def add_jenis(jenis):
         print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
         return None  # Mengembalikan None atau bisa juga mengangkat exception
 
+'''<--- Query untuk Table Tipe Karyawan --->'''
+def get_list_tipe():
+    try:
+        # Menjalankan query untuk mendapatkan daftar tipe karyawan
+        result = connection.execute(
+            text("""SELECT * FROM TipeKaryawan WHERE status = 1;""")
+        )
+        
+        # Mengonversi hasil menjadi daftar dictionary
+        tipe_list = [dict(row) for row in result.mappings()]  # Mengonversi hasil ke dalam format dictionary
+        return tipe_list
+    except SQLAlchemyError as e:
+        print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
+        return []  # Mengembalikan daftar kosong jika terjadi kesalahan
 
 '''<--- Query untuk Table  Karyawan --->'''
 def get_list_karyawan():
     try:
         # Menjalankan query untuk mendapatkan daftar karyawan
         result = connection.execute(
-            text("""SELECT k.id_karyawan, k.id_jenis, j.jenis, k.nama, k.gaji_pokok, k.username, k.token 
+            text("""SELECT k.id_karyawan, k.id_jenis, j.jenis, k.id_tipe, t.tipe, k.nama, k.gaji_pokok, k.username, k.kode_pemulihan 
                 FROM Karyawan k 
-                INNER JOIN JenisKaryawan j ON k.id_jenis = j.id_jenis 
+                INNER JOIN JenisKaryawan j ON k.id_jenis = j.id_jenis
+                INNER JOIN TipeKaryawan t on k.id_tipe = t.id_tipe
                 WHERE k.status = 1 AND j.jenis != 'direktur';""")
         )
         
@@ -112,21 +127,21 @@ def get_karyawan(id):
         print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
         return None  # Mengembalikan None jika terjadi kesalahan
 
-def add_karyawan(jenis, nama, gaji_pokok, username, token):
+def add_karyawan(jenis, nama, gaji_pokok, username, kode_pemulihan):
     # Kedepannya akan menggunakan Hash password sebelum menyimpannya
     # hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
 
     try:
         # Menggunakan parameter binding untuk keamanan
         result = connection.execute(
-            text("""INSERT INTO Karyawan (id_jenis, nama, gaji_pokok, username, token, status) 
-                     VALUES (:jenis, :nama, :gaji_pokok, :username, :token, 1)"""),
+            text("""INSERT INTO Karyawan (id_jenis, nama, gaji_pokok, username, kode_pemulihan, status) 
+                     VALUES (:jenis, :nama, :gaji_pokok, :username, :kode_pemulihan, 1)"""),
             {
                 "jenis": jenis,
                 "nama": nama,
                 "gaji_pokok": gaji_pokok,
                 "username": username,
-                "token": token
+                "kode_pemulihan": kode_pemulihan
             }
         )
         
@@ -140,7 +155,7 @@ def add_karyawan(jenis, nama, gaji_pokok, username, token):
         print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
         return None  # Mengembalikan None atau bisa juga mengangkat exception
 
-def update_karyawan(id_emp, jenis, nama, gaji_pokok, username, token):
+def update_karyawan(id_emp, jenis, nama, gaji_pokok, username, kode_pemulihan):
     try:
         # Menyiapkan query untuk update
         result = connection.execute(
@@ -150,7 +165,7 @@ def update_karyawan(id_emp, jenis, nama, gaji_pokok, username, token):
                     nama = :nama, 
                     gaji_pokok = :gaji_pokok, 
                     username = :username, 
-                    token = :token, 
+                    kode_pemulihan = :kode_pemulihan, 
                     updated_at = CURRENT_TIMESTAMP 
                 WHERE id_karyawan = :id_emp
             """),
@@ -159,7 +174,7 @@ def update_karyawan(id_emp, jenis, nama, gaji_pokok, username, token):
                 "nama": nama,
                 "gaji_pokok": gaji_pokok,
                 "username": username,
-                "token": token,  # Menggunakan password yang diberikan
+                "kode_pemulihan": kode_pemulihan,  # Menggunakan password yang diberikan
                 "id_emp": id_emp
             }
         )
@@ -411,14 +426,14 @@ def get_login_karyawan(username, password):
         if not result:
             result = connection.execute(
                 text("""
-                    SELECT k.id_karyawan, k.username, k.token, j.jenis, k.nama, k.status
+                    SELECT k.id_karyawan, k.username, k.kode_pemulihan, j.jenis, k.nama, k.status
                     FROM Karyawan k
                     INNER JOIN JenisKaryawan j ON k.id_jenis = j.id_jenis
                     WHERE k.username = :username
-                    AND k.token = :token
+                    AND k.kode_pemulihan = :kode_pemulihan
                     AND k.status = 1;
                 """),
-                {"username": username, "token": password}  # pakai 'password' sebagai input untuk token juga
+                {"username": username, "kode_pemulihan": password}  # pakai 'password' sebagai input untuk token juga
             ).mappings().fetchone()
 
         if not result:
@@ -450,17 +465,17 @@ def get_login_admin(username, password):
             {"username": username, "password": password}
         ).mappings().fetchone()
 
-        # Jika tidak ditemukan, coba cek dengan token
+        # Jika tidak ditemukan, coba cek dengan kode_pemulihan
         if not result:
             result = connection.execute(
                 text("""
-                    SELECT id_admin, nama, username, token, status
+                    SELECT id_admin, nama, username, kode_pemulihan, status
                     FROM Admin
                     WHERE username = :username
-                    AND token = :token
+                    AND kode_pemulihan = :kode_pemulihan
                     AND status = 1;
                 """),
-                {"username": username, "token": password}
+                {"username": username, "kode_pemulihan": password}
             ).mappings().fetchone()
 
         if not result:
