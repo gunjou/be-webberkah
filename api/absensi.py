@@ -5,7 +5,7 @@ import re
 
 from .config import get_timezone
 from .decorator import role_required
-from .query import get_absensi_harian, get_list_absensi, add_checkin, hapus_absen_keluar, update_checkout, get_list_tidak_hadir, get_check_presensi, update_absensi_times, remove_abseni
+from .query import get_absensi_harian, get_list_absensi, add_checkin, hapus_absen_keluar, is_wfh_allowed, update_checkout, get_list_tidak_hadir, get_check_presensi, update_absensi_times, remove_abseni
 from .face_detection import verifikasi_wajah
 from .filter_radius import get_valid_office_name
 
@@ -87,10 +87,14 @@ def check_in(id_karyawan):
         return jsonify({'error': f'Format data lokasi anda salah. Latitude: {user_lat}, Longitude: {user_lon}'}), 400
 
     # Cek apakah user dalam radius lokasi yang diizinkan
-    lokasi_absensi = get_valid_office_name(user_lat, user_lon)
+    wfh_allowed = is_wfh_allowed(id_karyawan)
 
-    if lokasi_absensi is None:
-        return jsonify({'status': 'error', 'message': 'Anda berada diluar lokasi kerja, lakukan absensi di lokasi yang sudah ditentukan!'}), 403
+    if not wfh_allowed:
+        lokasi_absensi = get_valid_office_name(user_lat, user_lon)
+        if lokasi_absensi is None:
+            return jsonify({'status': 'error', 'message': 'Anda berada diluar lokasi kerja, lakukan absensi di lokasi yang sudah ditentukan!'}), 403
+    else:
+        lokasi_absensi = "WFH"
 
     # Upload file
     image = request.files['file']
@@ -141,11 +145,15 @@ def check_out(id_karyawan):
         return jsonify({'error': f'Format data lokasi anda salah. Latitude: {user_lat}, Longitude: {user_lon}'}), 400
 
     # Cek apakah user dalam radius lokasi yang diizinkan
-    lokasi_absensi = get_valid_office_name(user_lat, user_lon)
+    wfh_allowed = is_wfh_allowed(id_karyawan)
 
-    if lokasi_absensi is None:
-        return jsonify({'status': 'error', 'message': 'Anda berada diluar lokasi kerja, lakukan absensi di lokasi yang sudah ditentukan!'}), 403
-
+    if not wfh_allowed:
+        lokasi_absensi = get_valid_office_name(user_lat, user_lon)
+        if lokasi_absensi is None:
+            return jsonify({'status': 'error', 'message': 'Anda berada diluar lokasi kerja, lakukan absensi di lokasi yang sudah ditentukan!'}), 403
+    else:
+        lokasi_absensi = "WFH"
+        
     # Upload file
     image = request.files['file']
 

@@ -264,6 +264,17 @@ def update_checkout(id_karyawan, tanggal, jam_keluar, lokasi_absensi, jam_kurang
         print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
         return None  # Mengembalikan None jika terjadi kesalahan
 
+def is_wfh_allowed(id_karyawan):
+    try:
+        result = connection.execute(
+            text("SELECT status FROM wfh_karyawan WHERE id_karyawan = :id_karyawan AND status = 1"),
+            {"id_karyawan": id_karyawan}
+        ).fetchone()
+        return result is not None  # True jika ada data aktif
+    except SQLAlchemyError as e:
+        print(f"Error checking WFH status: {str(e)}")
+        return False
+
 def hapus_absen_keluar(id_absensi): # /absen karyawan
     try:
         query = text("""
