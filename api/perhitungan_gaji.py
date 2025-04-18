@@ -49,16 +49,14 @@ def rekap_gaji():
         gaji_per_hari = gaji_pokok / 26
         gaji_per_menit = gaji_pokok / 12480
 
-        # Hitung Gaji Kotor
-        gaji_kotor = hari_dibayar * gaji_per_hari
-
-        # Potongan keterlambatan dan jam kurang
+        # Ambil jam
         total_terlambat = row.get("total_jam_terlambat") or 0
-        total_kurang = row.get("total_jam_kurang") or 0
-        total_potongan_menit = total_terlambat + total_kurang
-        potongan = total_potongan_menit * gaji_per_menit
+        total_jam_bolos = row.get("total_jam_kurang") or 0  # ini rename field lama
+        total_jam_kurang = total_terlambat + total_jam_bolos
 
-        # Hitung Gaji Bersih
+        # Potongan
+        potongan = total_jam_kurang * gaji_per_menit
+        gaji_kotor = hari_dibayar * gaji_per_hari
         gaji_bersih = max(gaji_kotor - potongan, 0)
 
         # Tambahkan ke hasil
@@ -67,6 +65,8 @@ def rekap_gaji():
         row['gaji_kotor'] = round(gaji_kotor)
         row['potongan'] = round(potongan)
         row['gaji_bersih'] = round(gaji_bersih)
+        row['total_jam_bolos'] = total_jam_bolos
+        row['total_jam_kurang'] = total_jam_kurang  # hasil dari jam bolos + telat
 
     return {
         'tanggal_start': start.strftime("%d-%m-%Y"),
