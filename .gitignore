@@ -3,6 +3,7 @@
 
 ### Custom Ignore ###
 foto_pegawai/
+cropped/
 venv_webhook/
 deploy.sh
 webhook.py
