@@ -127,17 +127,18 @@ def get_karyawan(id):
         print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
         return None  # Mengembalikan None jika terjadi kesalahan
 
-def add_karyawan(jenis, nama, gaji_pokok, username, kode_pemulihan):
+def add_karyawan(jenis, tipe, nama, gaji_pokok, username, kode_pemulihan):
     # Kedepannya akan menggunakan Hash password sebelum menyimpannya
     # hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
 
     try:
         # Menggunakan parameter binding untuk keamanan
         result = connection.execute(
-            text("""INSERT INTO Karyawan (id_jenis, nama, gaji_pokok, username, kode_pemulihan, status) 
-                     VALUES (:jenis, :nama, :gaji_pokok, :username, :kode_pemulihan, 1)"""),
+            text("""INSERT INTO Karyawan (id_jenis, tipe, nama, gaji_pokok, username, kode_pemulihan, status) 
+                     VALUES (:jenis, :tipe, :nama, :gaji_pokok, :username, :kode_pemulihan, 1)"""),
             {
                 "jenis": jenis,
+                "tipe": tipe,
                 "nama": nama,
                 "gaji_pokok": gaji_pokok,
                 "username": username,
