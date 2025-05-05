@@ -134,7 +134,7 @@ def add_karyawan(jenis, tipe, nama, gaji_pokok, username, kode_pemulihan):
     try:
         # Menggunakan parameter binding untuk keamanan
         result = connection.execute(
-            text("""INSERT INTO Karyawan (id_jenis, tipe, nama, gaji_pokok, username, kode_pemulihan, status) 
+            text("""INSERT INTO Karyawan (id_jenis, id_tipe, nama, gaji_pokok, username, kode_pemulihan, status) 
                      VALUES (:jenis, :tipe, :nama, :gaji_pokok, :username, :kode_pemulihan, 1)"""),
             {
                 "jenis": jenis,
