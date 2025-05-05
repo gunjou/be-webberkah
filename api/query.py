@@ -163,7 +163,7 @@ def update_karyawan(id_emp, jenis, tipe, nama, gaji_pokok, username, kode_pemuli
             text("""
                 UPDATE Karyawan 
                 SET id_jenis = :jenis, 
-                    tipe = :tipe,
+                    id_tipe = :tipe,
                     nama = :nama,
                     gaji_pokok = :gaji_pokok, 
                     username = :username, 
