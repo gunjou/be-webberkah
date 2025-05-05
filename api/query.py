@@ -156,14 +156,15 @@ def add_karyawan(jenis, tipe, nama, gaji_pokok, username, kode_pemulihan):
         print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
         return None  # Mengembalikan None atau bisa juga mengangkat exception
 
-def update_karyawan(id_emp, jenis, nama, gaji_pokok, username, kode_pemulihan):
+def update_karyawan(id_emp, jenis, tipe, nama, gaji_pokok, username, kode_pemulihan):
     try:
         # Menyiapkan query untuk update
         result = connection.execute(
             text("""
                 UPDATE Karyawan 
                 SET id_jenis = :jenis, 
-                    nama = :nama, 
+                    tipe = :tipe,
+                    nama = :nama,
                     gaji_pokok = :gaji_pokok, 
                     username = :username, 
                     kode_pemulihan = :kode_pemulihan, 
@@ -172,6 +173,7 @@ def update_karyawan(id_emp, jenis, nama, gaji_pokok, username, kode_pemulihan):
             """),
             {
                 "jenis": jenis,
+                "tipe": tipe,
                 "nama": nama,
                 "gaji_pokok": gaji_pokok,
                 "username": username,
