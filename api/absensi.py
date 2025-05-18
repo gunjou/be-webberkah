@@ -87,14 +87,14 @@ def check_in(id_karyawan):
         return jsonify({'error': f'Format data lokasi anda salah. Latitude: {user_lat}, Longitude: {user_lon}'}), 400
 
     # Cek apakah user dalam radius lokasi yang diizinkan
-    wfh_allowed = is_wfh_allowed(id_karyawan)
+    lokasi_absensi = get_valid_office_name(user_lat, user_lon)
 
-    if not wfh_allowed:
-        lokasi_absensi = get_valid_office_name(user_lat, user_lon)
-        if lokasi_absensi is None:
+    if lokasi_absensi is None:
+        # Tidak berada di kantor, cek apakah WFH diperbolehkan
+        if is_wfh_allowed(id_karyawan):
+            lokasi_absensi = "WFH"
+        else:
             return jsonify({'status': 'error', 'message': 'Anda berada diluar lokasi kerja, lakukan absensi di lokasi yang sudah ditentukan!'}), 403
-    else:
-        lokasi_absensi = "WFH"
 
     # Upload file
     image = request.files['file']
@@ -145,14 +145,14 @@ def check_out(id_karyawan):
         return jsonify({'error': f'Format data lokasi anda salah. Latitude: {user_lat}, Longitude: {user_lon}'}), 400
 
     # Cek apakah user dalam radius lokasi yang diizinkan
-    wfh_allowed = is_wfh_allowed(id_karyawan)
+    lokasi_absensi = get_valid_office_name(user_lat, user_lon)
 
-    if not wfh_allowed:
-        lokasi_absensi = get_valid_office_name(user_lat, user_lon)
-        if lokasi_absensi is None:
+    if lokasi_absensi is None:
+        # Jika tidak di lokasi kantor, cek apakah diperbolehkan WFH
+        if is_wfh_allowed(id_karyawan):
+            lokasi_absensi = "WFH"
+        else:
             return jsonify({'status': 'error', 'message': 'Anda berada diluar lokasi kerja, lakukan absensi di lokasi yang sudah ditentukan!'}), 403
-    else:
-        lokasi_absensi = "WFH"
         
     # Upload file
     image = request.files['file']
