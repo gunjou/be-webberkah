@@ -1,0 +1,114 @@
+import os
+from datetime import datetime
+from flask import Blueprint, request
+from werkzeug.utils import secure_filename
+
+from .decorator import role_required
+from .query import add_permohonan_izin, approve_izin, check_notif, reject_izin, remove_pengajuan
+from .config import get_allowed_extensions
+
+perizinan_bp = Blueprint('api', __name__)
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in get_allowed_extensions()
+
+"""<-- Karyawan Side -->"""
+@perizinan_bp.route('/pengajuan-izin', methods=['POST'])
+@role_required('karyawan')
+def pengajuan_izin():
+    from flask_jwt_extended import get_jwt_identity
+    id_karyawan = get_jwt_identity()
+
+    # Ambil data dari form
+    id_jenis = request.form.get('jenis_izin', type=int)
+    tgl_mulai = request.form.get('tgl_mulai')
+    tgl_selesai = request.form.get('tgl_selesai')
+    keterangan = request.form.get('keterangan')
+    file = request.files.get('lampiran')
+
+    # Validasi dasar
+    if not all([id_jenis, tgl_mulai, tgl_selesai, keterangan]):
+        return {'status': "Semua kolom harus diisi"}, 400
+
+    # Mapping jenis
+    jenis_map = {3: 'izin', 4: 'sakit'}
+    jenis_label = jenis_map.get(id_jenis)
+    if not jenis_label:
+        return {'status': "Jenis izin tidak valid"}, 400
+
+    # Validasi lampiran hanya untuk sakit
+    if id_jenis == 4 and not file:
+        return {'status': "Lampiran wajib diunggah untuk izin sakit"}, 400
+
+    # Simpan file jika ada
+    path_lampiran = None
+    if file:
+        if not allowed_file(file.filename):
+            return {'status': "Format file tidak diperbolehkan"}, 400
+
+        ekstensi = file.filename.rsplit('.', 1)[1].lower()
+        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+        filename = secure_filename(f"lampiran_{jenis_label}_{timestamp}.{ekstensi}")
+
+        # Folder upload satu tingkat di atas direktori ini
+        base_upload_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'uploads'))
+        folder_path = os.path.join(base_upload_dir, datetime.now().strftime('%Y/%m'))
+        os.makedirs(folder_path, exist_ok=True)
+
+        full_path = os.path.join(folder_path, filename)
+        file.save(full_path)
+
+        path_lampiran = full_path
+
+    # Simpan data ke DB
+    id_izin = add_permohonan_izin(id_karyawan, id_jenis, tgl_mulai, tgl_selesai, keterangan, path_lampiran)
+
+    if id_izin is None:
+        return {'status': "Gagal mengirimkan permohonan izin"}, 500
+
+    return {'status': "Berhasil mengirimkan permohonan izin", 'id_izin': id_izin}, 201
+
+@perizinan_bp.route('/hapus-pengajuan/<int:id_izin>', methods=['DELETE'])
+@role_required('karyawan')
+def hapus_pengajuan(id_izin):
+    try:
+        result = remove_pengajuan(id_izin)
+        if result is None or result == 0:
+            return {'status': "Gagal menghapus permohonan izin"}, 500
+        return {'status': "Berhasil menghapus permohonan izin"}, 200
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}, 500
+
+
+"""<-- Admin Side -->"""
+@perizinan_bp.route('/check-notif', methods=['GET'])
+@role_required('admin')
+def notifikasi_izin():
+    try:
+        notifikasi_list = check_notif()
+        return {'status': 'success', 'data': notifikasi_list, 'count': len(notifikasi_list)}, 200
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}, 500
+    
+@perizinan_bp.route('/izin/<int:id_izin>/approve', methods=['POST'])
+@role_required('admin')
+def izin_diterima(id_izin):
+    try:
+        approve_izin(id_izin)
+        return {'status': 'success', 'message': 'Izin disetujui'}
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}, 500
+    
+@perizinan_bp.route('/izin/<int:id_izin>/reject', methods=['POST'])
+@role_required('admin')
+def izin_ditolak(id_izin):
+    alasan = request.json.get('alasan_penolakan', '')
+    if not alasan:
+        return {'status': 'error', 'message': 'Alasan penolakan wajib diisi'}, 400
+
+    try:
+        reject_izin(id_izin, alasan)
+        return {'status': 'success', 'message': 'Izin ditolak'}
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}, 500
+    

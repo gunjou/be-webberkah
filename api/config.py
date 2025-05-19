@@ -5,8 +5,10 @@ from dotenv import load_dotenv
 from sqlalchemy import create_engine
 
 
+# load .env
 load_dotenv()
 
+# === Konfigurasi Database === #
 def get_connection():
     # server = 'localhost:5432' # localhost
     host = os.getenv("DB_HOST", "localhost")
@@ -17,6 +19,7 @@ def get_connection():
 
     return create_engine(f'postgresql+psycopg2://{username}:{password}@{host}:{port}/{dbname}')
 
+# === Konfigurasi Waktu WITA === #
 def get_timezone():
     wita = pytz.timezone("Asia/Makassar")
     now = datetime.now(wita)
@@ -32,3 +35,10 @@ def get_datetime_now():
     formatted_time = now.strftime("%Y-%m-%d %H:%M:%S.") + f"{int(now.microsecond / 1000):03d}"
 
     return formatted_time
+
+# === Konfigurasi Upload File === #
+def get_allowed_extensions():
+    return {'pdf', 'jpg', 'jpeg', 'png'}
+
+def get_max_upload_size():
+    return 5 * 1024 * 1024  # 5MB

@@ -10,6 +10,7 @@ from .autentikasi import autentikasi_bp
 from .cek_presensi import cek_presensi_bp
 from .rekapan import rekapan_bp
 from .perhitungan_gaji import perhitungan_gaji_bp
+from .perizinan import perizinan_bp
 from .blacklist_store import is_blacklisted
 
 
@@ -28,6 +29,7 @@ api.register_blueprint(autentikasi_bp, name='autentikasi')
 api.register_blueprint(cek_presensi_bp, name='cek_presensi')
 api.register_blueprint(perhitungan_gaji_bp, name='perhitungan_gaji')
 api.register_blueprint(rekapan_bp, name='rekapan')
+api.register_blueprint(perizinan_bp, name='perizinan')
 
 
 jwt = JWTManager(api)

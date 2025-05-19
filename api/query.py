@@ -712,3 +712,102 @@ def get_list_rekapan_person(start_date, end_date, id_karyawan):
     except Exception as e:
         print(f"Query Error: {str(e)}")
         return []
+
+
+"""<-- Query Perizinan.py -->"""
+def add_permohonan_izin(id_karyawan, id_jenis, tgl_mulai, tgl_selesai, keterangan, path_lampiran):
+    try:
+        result = connection.execute(
+            text("""
+                INSERT INTO izin (id_karyawan, id_jenis, keterangan, tgl_mulai, tgl_selesai, path_lampiran, status_izin, status)
+                VALUES (:id_karyawan, :id_jenis, :keterangan, :tgl_mulai, :tgl_selesai, :path_lampiran, 'pending', 1)
+                RETURNING id_izin
+            """),
+            {
+                "id_karyawan": id_karyawan,
+                "id_jenis": id_jenis,
+                "keterangan": keterangan,
+                "tgl_mulai": tgl_mulai,
+                "tgl_selesai": tgl_selesai,
+                "path_lampiran": path_lampiran,
+            }
+        )
+        connection.commit()
+        return result.fetchone()[0]  # id_izin
+    except SQLAlchemyError as e:
+        connection.rollback()
+        print(f"Error occurred: {str(e)}")
+        return None
+    
+def check_notif():
+    try:
+        query = text("""
+            SELECT i.id_izin, i.id_karyawan, k.nama, i.id_jenis, s.nama_status, i.keterangan, i.tgl_mulai, i.tgl_selesai, i.status_izin, i.path_lampiran, i.created_at
+            FROM izin i
+            INNER JOIN karyawan k ON k.id_karyawan = i.id_karyawan
+            INNER JOIN statuspresensi s ON s.id_status = i.id_jenis
+            WHERE i.status_izin = 'pending'
+            AND i.status = 1
+            ORDER BY created_at DESC
+        """)
+        result = connection.execute(query)
+        rows = result.mappings().fetchall()
+        return [dict(row) for row in rows] if rows else []
+    except Exception as e:
+        print(f"Query Error: {str(e)}")
+        return []
+    
+def approve_izin(id_izin):
+    try:
+        result = connection.execute(
+            text("""
+                UPDATE izin
+                SET status_izin = 'approved', updated_at = CURRENT_TIMESTAMP
+                WHERE id_izin = :id_izin
+            """),
+            {
+                "id_izin": id_izin,
+            }
+        )
+        connection.commit()
+        return result.fetchone()[0]  # id_izin
+    except SQLAlchemyError as e:
+        connection.rollback()
+        print(f"Error occurred: {str(e)}")
+        return None
+    
+def reject_izin(id_izin, alasan):
+    try:
+        result = connection.execute(
+            text("""
+                UPDATE izin
+                SET status_izin = 'rejected', alasan_penolakan = :alasan, updated_at = CURRENT_TIMESTAMP
+                WHERE id_izin = :id_izin
+            """),
+            {
+                'id_izin': id_izin, 
+                'alasan': alasan
+            }
+        )
+        connection.commit()
+        return result.fetchone()[0]  # id_izin
+    except SQLAlchemyError as e:
+        connection.rollback()
+        print(f"Error occurred: {str(e)}")
+        return None
+    
+def remove_pengajuan(id_izin):
+    try:
+        result = connection.execute(
+            text("""UPDATE izin
+                SET status = 0, updated_at = CURRENT_TIMESTAMP
+                WHERE id_izin = :id_izin
+            """),
+            {"id_izin": id_izin} 
+        )
+        connection.commit()
+        return result.rowcount
+    except SQLAlchemyError as e:
+        connection.rollback()
+        print(f"Error occurred: {str(e)}")
+        return None
