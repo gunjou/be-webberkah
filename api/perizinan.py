@@ -4,7 +4,7 @@ from flask import Blueprint, request
 from werkzeug.utils import secure_filename
 
 from .decorator import role_required
-from .query import add_permohonan_izin, approve_izin, check_izin, get_all_izin_by_date, reject_izin, remove_pengajuan
+from .query import add_permohonan_izin, approve_izin, check_izin, create_notifikasi, get_all_izin_by_date, get_id_karyawan_from_izin, get_karyawan, reject_izin, remove_pengajuan
 from .config import get_allowed_extensions
 
 perizinan_bp = Blueprint('api', __name__)
@@ -18,6 +18,7 @@ def allowed_file(filename):
 def pengajuan_izin():
     from flask_jwt_extended import get_jwt_identity
     id_karyawan = get_jwt_identity()
+    karyawan = get_karyawan(id_karyawan)
 
     # Ambil data dari form
     id_jenis = request.form.get('jenis_izin', type=int)
@@ -62,6 +63,13 @@ def pengajuan_izin():
 
     # Simpan data ke DB
     id_izin = add_permohonan_izin(id_karyawan, id_jenis, tgl_mulai, tgl_selesai, keterangan, path_lampiran)
+    create_notifikasi(
+        id_karyawan=None,  # untuk admin
+        role_user='admin',
+        jenis='izin',
+        subject='Pengajuan Izin Baru',
+        pesan=f"{karyawan['nama']} mengajukan izin dari {tgl_mulai} sampai {tgl_selesai}."
+    )
 
     if id_izin is None:
         return {'status': "Gagal mengirimkan permohonan izin"}, 500
@@ -151,6 +159,14 @@ def list_izin():
 def izin_diterima(id_izin):
     try:
         approve_izin(id_izin)
+        id_karyawan = get_id_karyawan_from_izin(id_izin)
+        create_notifikasi(
+            id_karyawan=id_karyawan,
+            role_user='karyawan',
+            jenis='izin',
+            subject='Status Permohonan Izin',
+            pesan='Permohonan izin Anda telah disetujui.'  # atau ditolak
+        )
         return {'status': 'success', 'message': 'Izin disetujui'}
     except Exception as e:
         return {'status': 'error', 'message': str(e)}, 500
@@ -164,6 +180,14 @@ def izin_ditolak(id_izin):
 
     try:
         reject_izin(id_izin, alasan)
+        id_karyawan = get_id_karyawan_from_izin(id_izin)
+        create_notifikasi(
+            id_karyawan=id_karyawan,
+            role_user='karyawan',
+            jenis='izin',
+            subject='Status Permohonan Izin',
+            pesan='Permohonan izin Anda telah ditolak.'  # atau disetujui
+        )
         return {'status': 'success', 'message': 'Izin ditolak'}
     except Exception as e:
         return {'status': 'error', 'message': str(e)}, 500

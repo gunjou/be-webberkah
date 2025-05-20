@@ -4,19 +4,22 @@ from flask import Blueprint, request
 from werkzeug.utils import secure_filename
 from flask_jwt_extended import get_jwt_identity
 
-from .perizinan import allowed_file
-from .query import add_permohonan_lembur, approve_lembur, check_lembur, get_all_lembur_by_date, reject_lembur, remove_pengajuan_lembur
-
+from .config import get_allowed_extensions
+from .query import add_permohonan_lembur, approve_lembur, check_lembur, create_notifikasi, get_all_lembur_by_date, get_id_karyawan_from_lembur, get_karyawan, reject_lembur, remove_pengajuan_lembur
 from .decorator import role_required
 
 
 lembur_bp = Blueprint('api', __name__)
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in get_allowed_extensions()
 
 """<-- Karyawan Side -->"""
 @lembur_bp.route('/pengajuan-lembur', methods=['POST'])
 @role_required('karyawan')
 def pengajuan_lembur():
     id_karyawan = get_jwt_identity()
+    karyawan = get_karyawan(id_karyawan)
 
     # Ambil data dari form
     tanggal = request.form.get('tanggal')
@@ -51,6 +54,13 @@ def pengajuan_lembur():
 
     # Simpan ke DB
     id_lembur = add_permohonan_lembur(id_karyawan, tanggal, jam_mulai, jam_selesai, deskripsi, path_lampiran)
+    create_notifikasi(
+        id_karyawan=None,
+        role_user='admin',
+        jenis='lembur',
+        subject='Pengajuan Lembur Baru',
+        pesan=f"{karyawan['nama']} mengajukan lembur pada {tanggal} pukul {jam_mulai} - {jam_selesai}."
+    )
 
     if id_lembur is None:
         return {'status': "Gagal mengirimkan permohonan lembur"}, 500
@@ -142,6 +152,14 @@ def list_lembur():
 def lembur_diterima(id_lembur):
     try:
         approve_lembur(id_lembur)
+        id_karyawan = get_id_karyawan_from_lembur(id_lembur)
+        create_notifikasi(
+            id_karyawan=id_karyawan,
+            role_user='karyawan',
+            jenis='lembur',
+            subject='Status Permohonan Lembur',
+            pesan='Permohonan lembur Anda telah disetujui.'  # atau ditolak
+        )
         return {'status': 'success', 'message': 'Lembur disetujui'}
     except Exception as e:
         return {'status': 'error', 'message': str(e)}, 500
@@ -155,6 +173,14 @@ def lembur_ditolak(id_lembur):
 
     try:
         reject_lembur(id_lembur, alasan)
+        id_karyawan = get_id_karyawan_from_lembur(id_lembur)
+        create_notifikasi(
+            id_karyawan=id_karyawan,
+            role_user='karyawan',
+            jenis='lembur',
+            subject='Status Permohonan Lembur',
+            pesan='Permohonan lembur Anda telah ditolak.'  # atau disetujui
+        )
         return {'status': 'success', 'message': 'Lembur ditolak'}
     except Exception as e:
         return {'status': 'error', 'message': str(e)}, 500

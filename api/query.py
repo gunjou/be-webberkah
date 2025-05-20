@@ -126,6 +126,30 @@ def get_karyawan(id):
     except SQLAlchemyError as e:
         print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
         return None  # Mengembalikan None jika terjadi kesalahan
+    
+def get_id_karyawan_from_izin(id):
+    try:
+        result = connection.execute(
+            text("SELECT id_karyawan FROM izin WHERE id_izin = :id AND status = 1"),
+            {"id": id}
+        ).scalar()  # Langsung ambil nilai pertama dari hasil query
+
+        return result  # Akan bernilai None jika tidak ditemukan
+    except SQLAlchemyError as e:
+        print(f"Error occurred: {str(e)}")
+        return None
+    
+def get_id_karyawan_from_lembur(id):
+    try:
+        result = connection.execute(
+            text("SELECT id_karyawan FROM lembur WHERE id_lembur = :id AND status = 1"),
+            {"id": id}
+        ).scalar()  # Langsung ambil nilai pertama dari hasil query
+
+        return result  # Akan bernilai None jika tidak ditemukan
+    except SQLAlchemyError as e:
+        print(f"Error occurred: {str(e)}")
+        return None
 
 def add_karyawan(jenis, tipe, nama, gaji_pokok, username, kode_pemulihan):
     # Kedepannya akan menggunakan Hash password sebelum menyimpannya
@@ -990,24 +1014,62 @@ def reject_izin(id_izin, alasan):
     
 
 """<-- Query notifikasi.py -->"""
-def count_pending_notif():
+def create_notifikasi(id_karyawan, role_user, jenis, subject, pesan):
     try:
-        query = text("""
-            SELECT SUM(pending_count) AS total FROM (
-                SELECT COUNT(*) AS pending_count
-                FROM izin
-                WHERE status_izin = 'pending' AND status = 1
+        result = connection.execute(
+            text("""
+                INSERT INTO notifikasi (id_karyawan, role_user, jenis, subject, pesan, dibaca, created_at)
+                VALUES (:id_karyawan, :role_user, :jenis, :subject, :pesan, FALSE, CURRENT_TIMESTAMP)
+            """),
+            {
+                'id_karyawan': id_karyawan,
+                'role_user': role_user,
+                'jenis': jenis,
+                'subject': subject,
+                'pesan': pesan
+            }
+        )
+        connection.commit()
+        return True
+    except Exception as e:
+        print(f"Notifikasi Error: {str(e)}")
+        connection.rollback()
+        return False
+    
+def get_unread_notifikasi(role, id_karyawan=None):
+    try:
+        if role == 'admin':
+            query = text("""
+                SELECT * FROM notifikasi
+                WHERE role_user = 'admin' AND dibaca = false
+                ORDER BY created_at DESC
+            """)
+            result = connection.execute(query)
+        else:  # role == 'karyawan'
+            query = text("""
+                SELECT * FROM notifikasi
+                WHERE role_user = 'karyawan' AND id_karyawan = :id_karyawan AND dibaca = false
+                ORDER BY created_at DESC
+            """)
+            result = connection.execute(query, {"id_karyawan": id_karyawan})
 
-                UNION ALL
-
-                SELECT COUNT(*) AS pending_count
-                FROM lembur
-                WHERE status_lembur = 'pending' AND status = 1
-            ) AS combined
-        """)
-        result = connection.execute(query)
-        count = result.scalar()
-        return count or 0  # fallback ke 0 jika None
+        rows = result.mappings().fetchall()
+        return [dict(row) for row in rows]
     except Exception as e:
         print(f"Query Error: {str(e)}")
-        return 0
+        return []
+
+def set_notifikasi_dibaca(id_notifikasi):
+    try:
+        query = text("""
+            UPDATE notifikasi
+            SET dibaca = true
+            WHERE id_notifikasi = :id_notifikasi
+        """)
+        result = connection.execute(query, {"id_notifikasi": id_notifikasi})
+        connection.commit()
+        return result.rowcount > 0
+    except Exception as e:
+        connection.rollback()
+        print(f"Update Error: {str(e)}")
+        return False
