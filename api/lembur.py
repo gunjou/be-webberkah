@@ -1,11 +1,11 @@
-from datetime import datetime
+from datetime import datetime, date, time
 import os
 from flask import Blueprint, request
 from werkzeug.utils import secure_filename
 from flask_jwt_extended import get_jwt_identity
 
 from .perizinan import allowed_file
-from .query import add_permohonan_lembur, approve_lembur, check_lembur, reject_lembur, remove_pengajuan_lembur
+from .query import add_permohonan_lembur, approve_lembur, check_lembur, get_all_lembur_by_date, reject_lembur, remove_pengajuan_lembur
 
 from .decorator import role_required
 
@@ -72,7 +72,6 @@ def hapus_lembur(id_lembur):
 @role_required('karyawan')
 def lihat_lembur():
     from flask_jwt_extended import get_jwt_identity
-    from datetime import datetime, date
 
     id_karyawan = get_jwt_identity()
 
@@ -101,6 +100,43 @@ def lihat_lembur():
 
 
 """<-- Admin Side -->"""
+@lembur_bp.route('/lembur/list', methods=['GET'])
+@role_required('admin')
+def list_lembur():
+    tanggal = request.args.get('tanggal')  # format: YYYY-MM-DD
+
+    # Validasi format tanggal jika ada
+    if tanggal:
+        try:
+            datetime.strptime(tanggal, '%Y-%m-%d')
+        except ValueError:
+            return {'status': 'error', 'message': 'Format tanggal tidak valid (YYYY-MM-DD)'}, 400
+
+    try:
+        data_lembur = get_all_lembur_by_date(tanggal)
+
+        for lembur in data_lembur:
+            try:
+                # Konversi jam ke string agar JSON-serializable
+                jam_mulai = lembur['jam_mulai'].strftime('%H:%M') if isinstance(lembur['jam_mulai'], time) else str(lembur['jam_mulai'])
+                jam_selesai = lembur['jam_selesai'].strftime('%H:%M') if isinstance(lembur['jam_selesai'], time) else str(lembur['jam_selesai'])
+
+                lembur['jam_mulai'] = jam_mulai
+                lembur['jam_selesai'] = jam_selesai
+
+                # Hitung durasi (dalam jam)
+                jm = datetime.strptime(jam_mulai, '%H:%M')
+                js = datetime.strptime(jam_selesai, '%H:%M')
+                lembur['durasi_lembur'] = (js - jm).seconds // 3600
+            except Exception:
+                lembur['durasi_lembur'] = None
+
+
+        return {'status': 'success', 'data': data_lembur, 'count': len(data_lembur)}, 200
+
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}, 500
+
 @lembur_bp.route('/lembur/<int:id_lembur>/approve', methods=['POST'])
 @role_required('admin')
 def lembur_diterima(id_lembur):

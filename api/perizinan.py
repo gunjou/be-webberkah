@@ -4,7 +4,7 @@ from flask import Blueprint, request
 from werkzeug.utils import secure_filename
 
 from .decorator import role_required
-from .query import add_permohonan_izin, approve_izin, check_izin, reject_izin, remove_pengajuan
+from .query import add_permohonan_izin, approve_izin, check_izin, get_all_izin_by_date, reject_izin, remove_pengajuan
 from .config import get_allowed_extensions
 
 perizinan_bp = Blueprint('api', __name__)
@@ -116,6 +116,36 @@ def lihat_izin():
 
 
 """<-- Admin Side -->"""
+@perizinan_bp.route('/izin/list', methods=['GET'])
+@role_required('admin')
+def list_izin():
+    from datetime import datetime
+
+    tanggal = request.args.get('tanggal')  # format: YYYY-MM-DD
+
+    # Validasi format tanggal jika diberikan
+    if tanggal:
+        try:
+            datetime.strptime(tanggal, '%Y-%m-%d')
+        except ValueError:
+            return {'status': 'error', 'message': 'Format tanggal tidak valid (YYYY-MM-DD)'}, 400
+
+    try:
+        data_izin = get_all_izin_by_date(tanggal)
+
+        for izin in data_izin:
+            try:
+                tgl_mulai = datetime.strptime(str(izin['tgl_mulai']), '%Y-%m-%d')
+                tgl_selesai = datetime.strptime(str(izin['tgl_selesai']), '%Y-%m-%d')
+                izin['durasi_izin'] = (tgl_selesai - tgl_mulai).days + 1  # inklusif
+            except Exception as parse_err:
+                izin['durasi_izin'] = None  # fallback jika error parsing
+
+        return {'status': 'success', 'data': data_izin, 'count': len(data_izin)}, 200
+
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}, 500
+
 @perizinan_bp.route('/izin/<int:id_izin>/approve', methods=['POST'])
 @role_required('admin')
 def izin_diterima(id_izin):
