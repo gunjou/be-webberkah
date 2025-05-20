@@ -4,7 +4,7 @@ from flask import Blueprint, request
 from werkzeug.utils import secure_filename
 
 from .decorator import role_required
-from .query import add_permohonan_izin, approve_izin, check_notif, reject_izin, remove_pengajuan
+from .query import add_permohonan_izin, approve_izin, check_izin, reject_izin, remove_pengajuan
 from .config import get_allowed_extensions
 
 perizinan_bp = Blueprint('api', __name__)
@@ -79,17 +79,43 @@ def hapus_pengajuan(id_izin):
     except Exception as e:
         return {'status': 'error', 'message': str(e)}, 500
 
+@perizinan_bp.route('/check-izin', methods=['GET'])
+@role_required('karyawan')
+def lihat_izin():
+    from flask_jwt_extended import get_jwt_identity
+    from datetime import datetime, date
 
-"""<-- Admin Side -->"""
-@perizinan_bp.route('/check-notif', methods=['GET'])
-@role_required('admin')
-def notifikasi_izin():
+    id_karyawan = get_jwt_identity()
+
+    # Ambil tanggal dari query param, default ke hari ini
+    tanggal_str = request.args.get('tanggal')
     try:
-        notifikasi_list = check_notif()
-        return {'status': 'success', 'data': notifikasi_list, 'count': len(notifikasi_list)}, 200
+        if tanggal_str:
+            tanggal = datetime.strptime(tanggal_str, '%Y-%m-%d').date()
+        else:
+            tanggal = date.today()
+
+        detail_izin = check_izin(id_karyawan, tanggal)
+
+        if not detail_izin:
+            return {'status': 'success', 'data': None}, 200
+
+        # Format tanggal dan hitung jumlah hari
+        tgl_mulai = datetime.strptime(str(detail_izin['tgl_mulai']), '%Y-%m-%d')
+        tgl_selesai = datetime.strptime(str(detail_izin['tgl_selesai']), '%Y-%m-%d')
+        jumlah_hari = (tgl_selesai - tgl_mulai).days + 1
+
+        detail_izin['tgl_mulai'] = tgl_mulai.strftime('%d-%m-%Y')
+        detail_izin['tgl_selesai'] = tgl_selesai.strftime('%d-%m-%Y')
+        detail_izin['durasi_izin'] = jumlah_hari
+
+        return {'status': 'success', 'data': detail_izin}, 200
+
     except Exception as e:
         return {'status': 'error', 'message': str(e)}, 500
-    
+
+
+"""<-- Admin Side -->"""
 @perizinan_bp.route('/izin/<int:id_izin>/approve', methods=['POST'])
 @role_required('admin')
 def izin_diterima(id_izin):

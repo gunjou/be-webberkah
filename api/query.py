@@ -714,6 +714,110 @@ def get_list_rekapan_person(start_date, end_date, id_karyawan):
         return []
 
 
+"""<-- Query Lembur.py -->"""
+def add_permohonan_lembur(id_karyawan, tanggal, jam_mulai, jam_selesai, deskripsi, path_lampiran):
+    try:
+        result = connection.execute(
+            text("""
+                INSERT INTO lembur (id_karyawan, tanggal, jam_mulai, jam_selesai, deskripsi, path_lampiran, status_lembur, status)
+                VALUES (:id_karyawan, :tanggal, :jam_mulai, :jam_selesai, :deskripsi, :path_lampiran, 'pending', 1)
+                RETURNING id_lembur
+            """),
+            {
+                "id_karyawan": id_karyawan,
+                "tanggal": tanggal,
+                "jam_mulai": jam_mulai,
+                "jam_selesai": jam_selesai,
+                "deskripsi": deskripsi,
+                "path_lampiran": path_lampiran,
+            }
+        )
+        connection.commit()
+        return result.fetchone()[0]
+    except SQLAlchemyError as e:
+        connection.rollback()
+        print(f"Error occurred: {str(e)}")
+        return None
+
+def remove_pengajuan_lembur(id_lembur):
+    try:
+        result = connection.execute(
+            text("""
+                UPDATE lembur
+                SET status = 0, updated_at = CURRENT_TIMESTAMP
+                WHERE id_lembur = :id_lembur
+            """),
+            {"id_lembur": id_lembur}
+        )
+        connection.commit()
+        return result.rowcount
+    except SQLAlchemyError as e:
+        connection.rollback()
+        print(f"Error occurred: {str(e)}")
+        return None
+
+def check_lembur(id_karyawan, tanggal):
+    try:
+        query = text("""
+            SELECT l.id_lembur, l.id_karyawan, k.nama, l.tanggal, l.jam_mulai, 
+                   l.jam_selesai, l.deskripsi, l.status_lembur, l.path_lampiran, 
+                   l.created_at
+            FROM lembur l
+            INNER JOIN karyawan k ON k.id_karyawan = l.id_karyawan
+            WHERE l.id_karyawan = :id_karyawan
+            AND l.tanggal = :tanggal
+            AND l.status = 1
+            ORDER BY l.created_at DESC
+            LIMIT 1
+        """)
+        result = connection.execute(query, {
+            "id_karyawan": id_karyawan,
+            "tanggal": tanggal
+        })
+        row = result.mappings().fetchone()
+        return dict(row) if row else None
+    except Exception as e:
+        print(f"Query Error: {str(e)}")
+        return None
+    
+def approve_lembur(id_lembur):
+    try:
+        result = connection.execute(
+            text("""
+                UPDATE lembur
+                SET status_lembur = 'approved', updated_at = CURRENT_TIMESTAMP
+                WHERE id_lembur = :id_lembur
+            """),
+            {"id_lembur": id_lembur}
+        )
+        connection.commit()
+        return result.rowcount  # atau id_lembur jika dibutuhkan
+    except SQLAlchemyError as e:
+        connection.rollback()
+        print(f"Error occurred: {str(e)}")
+        return None
+
+def reject_lembur(id_lembur, alasan):
+    try:
+        result = connection.execute(
+            text("""
+                UPDATE lembur
+                SET status_lembur = 'rejected', alasan_penolakan = :alasan, updated_at = CURRENT_TIMESTAMP
+                WHERE id_lembur = :id_lembur
+            """),
+            {
+                'id_lembur': id_lembur,
+                'alasan': alasan
+            }
+        )
+        connection.commit()
+        return result.rowcount  # atau id_lembur jika dibutuhkan
+    except SQLAlchemyError as e:
+        connection.rollback()
+        print(f"Error occurred: {str(e)}")
+        return None
+
+
 """<-- Query Perizinan.py -->"""
 def add_permohonan_izin(id_karyawan, id_jenis, tgl_mulai, tgl_selesai, keterangan, path_lampiran):
     try:
@@ -739,23 +843,30 @@ def add_permohonan_izin(id_karyawan, id_jenis, tgl_mulai, tgl_selesai, keteranga
         print(f"Error occurred: {str(e)}")
         return None
     
-def check_notif():
+def check_izin(id_karyawan, tanggal):
     try:
         query = text("""
-            SELECT i.id_izin, i.id_karyawan, k.nama, i.id_jenis, s.nama_status, i.keterangan, i.tgl_mulai, i.tgl_selesai, i.status_izin, i.path_lampiran, i.created_at
+            SELECT i.id_izin, i.id_karyawan, k.nama, i.id_jenis, s.nama_status, 
+                   i.keterangan, i.tgl_mulai, i.tgl_selesai, i.status_izin, 
+                   i.path_lampiran, i.created_at
             FROM izin i
             INNER JOIN karyawan k ON k.id_karyawan = i.id_karyawan
             INNER JOIN statuspresensi s ON s.id_status = i.id_jenis
-            WHERE i.status_izin = 'pending'
+            WHERE i.id_karyawan = :id_karyawan
             AND i.status = 1
-            ORDER BY created_at DESC
+            AND :tanggal BETWEEN i.tgl_mulai AND i.tgl_selesai
+            ORDER BY i.created_at DESC
+            LIMIT 1
         """)
-        result = connection.execute(query)
-        rows = result.mappings().fetchall()
-        return [dict(row) for row in rows] if rows else []
+        result = connection.execute(query, {
+            "id_karyawan": id_karyawan,
+            "tanggal": tanggal
+        })
+        row = result.mappings().fetchone()
+        return dict(row) if row else None
     except Exception as e:
         print(f"Query Error: {str(e)}")
-        return []
+        return None
     
 def approve_izin(id_izin):
     try:
@@ -811,3 +922,27 @@ def remove_pengajuan(id_izin):
         connection.rollback()
         print(f"Error occurred: {str(e)}")
         return None
+    
+
+"""<-- Query notifikasi.py -->"""
+def count_pending_notif():
+    try:
+        query = text("""
+            SELECT SUM(pending_count) AS total FROM (
+                SELECT COUNT(*) AS pending_count
+                FROM izin
+                WHERE status_izin = 'pending' AND status = 1
+
+                UNION ALL
+
+                SELECT COUNT(*) AS pending_count
+                FROM lembur
+                WHERE status_lembur = 'pending' AND status = 1
+            ) AS combined
+        """)
+        result = connection.execute(query)
+        count = result.scalar()
+        return count or 0  # fallback ke 0 jika None
+    except Exception as e:
+        print(f"Query Error: {str(e)}")
+        return 0
