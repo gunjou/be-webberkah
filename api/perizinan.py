@@ -1,12 +1,16 @@
 import os
 from datetime import datetime
-from flask import Blueprint, request
+from flask import Blueprint, abort, request, send_file
+from flask_jwt_extended import jwt_required
 from werkzeug.utils import secure_filename
 
 from .decorator import role_required
 from .query import add_permohonan_izin, approve_izin, check_izin, create_notifikasi, get_all_izin_by_date, get_id_karyawan_from_izin, get_karyawan, reject_izin, remove_pengajuan
 from .config import get_allowed_extensions
 
+
+# Path root ke folder lampiran (harus sama dengan tempat file disimpan saat upload)
+BASE_UPLOAD_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'uploads'))
 perizinan_bp = Blueprint('api', __name__)
 
 def allowed_file(filename):
@@ -51,15 +55,16 @@ def pengajuan_izin():
         timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
         filename = secure_filename(f"lampiran_{jenis_label}_{timestamp}.{ekstensi}")
 
-        # Folder upload satu tingkat di atas direktori ini
-        base_upload_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'uploads'))
-        folder_path = os.path.join(base_upload_dir, datetime.now().strftime('%Y/%m'))
+        # Gunakan BASE_UPLOAD_FOLDER
+        folder_path = os.path.join(BASE_UPLOAD_FOLDER, datetime.now().strftime('%Y/%m'))
         os.makedirs(folder_path, exist_ok=True)
 
         full_path = os.path.join(folder_path, filename)
         file.save(full_path)
 
-        path_lampiran = full_path
+        # Ambil path relatif dari BASE_UPLOAD_FOLDER
+        rel_path = os.path.relpath(full_path, BASE_UPLOAD_FOLDER)
+        path_lampiran = rel_path  # <- ini yang akan disimpan ke DB
 
     # Simpan data ke DB
     id_izin = add_permohonan_izin(id_karyawan, id_jenis, tgl_mulai, tgl_selesai, keterangan, path_lampiran)
@@ -192,3 +197,16 @@ def izin_ditolak(id_izin):
     except Exception as e:
         return {'status': 'error', 'message': str(e)}, 500
     
+
+"""<-- Both Side -->"""
+@perizinan_bp.route('/lampiran/<path:filename>', methods=['GET'])
+@jwt_required()
+def get_lampiran(filename):
+    # Hanya izinkan akses dalam folder uploads
+    full_path = os.path.join(BASE_UPLOAD_FOLDER, filename)
+    safe_path = os.path.abspath(full_path)
+
+    if not safe_path.startswith(BASE_UPLOAD_FOLDER) or not os.path.exists(safe_path):
+        return abort(403)
+
+    return send_file(safe_path)

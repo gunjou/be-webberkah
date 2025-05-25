@@ -9,6 +9,8 @@ from .query import add_permohonan_lembur, approve_lembur, check_lembur, create_n
 from .decorator import role_required
 
 
+# Path root ke folder lampiran (harus sama dengan tempat file disimpan saat upload)
+BASE_UPLOAD_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'uploads'))
 lembur_bp = Blueprint('api', __name__)
 
 def allowed_file(filename):
@@ -42,15 +44,16 @@ def pengajuan_lembur():
         timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
         filename = secure_filename(f"lembur_{id_karyawan}_{timestamp}.{ekstensi}")
 
-        # Simpan file di folder ../uploads/YYYY/MM
-        base_upload_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'uploads'))
-        folder_path = os.path.join(base_upload_dir, datetime.now().strftime('%Y/%m'))
+        # Gunakan BASE_UPLOAD_FOLDER
+        folder_path = os.path.join(BASE_UPLOAD_FOLDER, datetime.now().strftime('%Y/%m'))
         os.makedirs(folder_path, exist_ok=True)
 
         full_path = os.path.join(folder_path, filename)
         file.save(full_path)
 
-        path_lampiran = full_path
+        # Ambil path relatif dari BASE_UPLOAD_FOLDER
+        rel_path = os.path.relpath(full_path, BASE_UPLOAD_FOLDER)
+        path_lampiran = rel_path  # <- ini yang akan disimpan ke DB
 
     # Simpan ke DB
     id_lembur = add_permohonan_lembur(id_karyawan, tanggal, jam_mulai, jam_selesai, deskripsi, path_lampiran)
