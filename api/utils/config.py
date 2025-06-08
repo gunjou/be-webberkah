@@ -19,6 +19,12 @@ def get_connection():
 
     return create_engine(f'postgresql+psycopg2://{username}:{password}@{host}:{port}/{dbname}')
 
+# === Mencari Timestamp WITA === #
+def get_wita():
+    wita = pytz.timezone('Asia/Makassar')
+    now_wita = datetime.now(wita)
+    return now_wita.replace(tzinfo=None)
+
 # === Konfigurasi Waktu WITA === #
 def get_timezone():
     wita = pytz.timezone("Asia/Makassar")

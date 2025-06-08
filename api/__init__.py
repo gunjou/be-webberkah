@@ -1,39 +1,33 @@
+import os
 from datetime import timedelta
+from dotenv import load_dotenv
 from flask import Flask
 from flask_jwt_extended import JWTManager
+from flask_restx import Api
 from flask_cors import CORS
 
-from .admin import admin_bp
-from .karyawan import karyawan_bp
-from .absensi import absensi_bp
-from .autentikasi import autentikasi_bp
-from .cek_presensi import cek_presensi_bp
-from .rekapan import rekapan_bp
-from .perhitungan_gaji import perhitungan_gaji_bp
-from .perizinan import perizinan_bp
-from .notifikasi import notifikasi_bp
-from .lembur import lembur_bp
-from .blacklist_store import is_blacklisted
+from .autentikasi import auth_ns
+from .admin import admin_ns
+from .pegawai import pegawai_ns
+from .jenis_pegawai import jenis_pegawai_ns
+from .tipe_pegawai import tipe_pegawai_ns
+from .absensi import absensi_ns
+from .rekapan import rekapan_ns
+from .perhitungan_gaji import perhitungan_ns
+
+from .utils.blacklist_store import is_blacklisted
 
 
 api = Flask(__name__)
 CORS(api)
 
-api.config['JWT_SECRET_KEY'] = 'berkahangsana2025'
-api.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=3)  # Atur sesuai kebutuhan
+# load .env
+load_dotenv()
+
+api.config['JWT_SECRET_KEY'] = os.getenv("JWT_SECRET_KEY")
+api.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=3)  # waktu login sesi
 api.config['JWT_BLACKLIST_ENABLED'] = True
 api.config['JWT_BLACKLIST_TOKEN_CHECKS'] = ['access', 'refresh']
-
-api.register_blueprint(admin_bp, name='admin')
-api.register_blueprint(karyawan_bp, name='karyawan')
-api.register_blueprint(absensi_bp, name='absensi')
-api.register_blueprint(autentikasi_bp, name='autentikasi')
-api.register_blueprint(cek_presensi_bp, name='cek_presensi')
-api.register_blueprint(perhitungan_gaji_bp, name='perhitungan_gaji')
-api.register_blueprint(rekapan_bp, name='rekapan')
-api.register_blueprint(perizinan_bp, name='perizinan')
-api.register_blueprint(notifikasi_bp, name='notifikasi')
-api.register_blueprint(lembur_bp, name='lembur')
 
 
 jwt = JWTManager(api)
@@ -41,7 +35,6 @@ jwt = JWTManager(api)
 @jwt.token_in_blocklist_loader
 def check_if_token_in_blacklist(jwt_header, jwt_payload):
     return is_blacklisted(jwt_payload['jti'])
-
 
 @jwt.expired_token_loader
 def expired_token_callback(jwt_header, jwt_payload):
@@ -55,3 +48,32 @@ def invalid_token_callback(reason):
 @jwt.unauthorized_loader
 def missing_token_callback(reason):
     return {'status': 'Missing token'}, 401
+
+authorizations = {
+    'Bearer Auth': {
+        'type': 'apiKey',
+        'in': 'header',
+        'name': 'Authorization',
+        'description': 'Masukkan token JWT Anda dengan format: **Bearer &lt;JWT&gt;**'
+    }
+}
+
+# Swagger API instance
+restx_api = Api(
+        api, 
+        version="2.0", 
+        title="Berkah Angsana", 
+        description="Dokumentasi API Berkah Angsana", 
+        doc="/documentation",
+        authorizations=authorizations,
+        security='Bearer Auth'
+    )
+
+restx_api.add_namespace(auth_ns, path="/auth")
+restx_api.add_namespace(admin_ns, path="/admin")
+restx_api.add_namespace(pegawai_ns, path="/pegawai")
+restx_api.add_namespace(jenis_pegawai_ns, path="/jenis-pegawai")
+restx_api.add_namespace(tipe_pegawai_ns, path="/tipe-pegawai")
+restx_api.add_namespace(absensi_ns, path="/absensi")
+restx_api.add_namespace(rekapan_ns, path="/rekapan")
+restx_api.add_namespace(perhitungan_ns, path="/perhitungan-gaji")

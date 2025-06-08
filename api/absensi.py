@@ -1,390 +1,308 @@
-from flask import Blueprint, jsonify, request
-from datetime import date, datetime, time
-import pytz
+from datetime import datetime
 import re
+from flask import request, logging
+from flask_restx import Namespace, Resource, fields
+from werkzeug.datastructures import FileStorage
+from sqlalchemy.exc import SQLAlchemyError
 
-from .config import get_timezone
-from .decorator import role_required
-from .query import get_absensi_harian, get_list_absensi, add_checkin, hapus_absen_keluar, is_wfh_allowed, update_checkout, get_list_tidak_hadir, get_check_presensi, update_absensi_times, remove_abseni
-from .face_detection import verifikasi_wajah
-from .filter_radius import get_valid_office_name
+from .utils.config import get_timezone
+from .utils.decorator import role_required
+from .utils.face_detection import verifikasi_wajah
+from .utils.filter_radius import get_valid_office_name
+from .utils.helpers import hitung_waktu_kerja, hitung_keterlambatan, hitung_jam_kurang
+
+from .query.q_absensi import *
 
 
-absensi_bp = Blueprint('api', __name__)
+absensi_ns = Namespace('absensi', description='API untuk absensi')
 
-def hitung_waktu_kerja(jam_masuk, jam_keluar):
-    if jam_keluar is None:
-        return 0  # Belum check-out, waktu kerja dianggap 0 menit
+upload_parser = absensi_ns.parser()
+upload_parser.add_argument('file', location='files', type=FileStorage, required=True, help='Foto wajah saat check-out')
+upload_parser.add_argument('latitude', type=str, required=True, help='Latitude lokasi saat check-out')
+upload_parser.add_argument('longitude', type=str, required=True, help='Longitude lokasi saat check-out')
 
-    total_masuk = jam_masuk.hour * 60 + jam_masuk.minute
-    total_keluar = jam_keluar.hour * 60 + jam_keluar.minute
+edit_absensi_model = absensi_ns.model('EditAbsensi', {
+    'jam_masuk': fields.String(required=True, description='Jam masuk (HH:MM)'),
+    'jam_keluar': fields.String(required=False, description='Jam keluar (HH:MM), boleh kosong/null'),
+    'lokasi_masuk': fields.String(required=False, description='Nama lokasi masuk (dipilih dari dropdown)'),
+    'lokasi_keluar': fields.String(required=False, description='Nama lokasi keluar (dipilih dari dropdown)')
+})
 
-    selisih = total_keluar - total_masuk
-    return max(selisih, 0)  # Hindari nilai negatif jika jam_keluar lebih kecil (data tidak valid)
-
-def hitung_keterlambatan(jam_masuk):
-    wita = pytz.timezone("Asia/Makassar")
-
-    # Konversi ke waktu WITA jika aware
-    if jam_masuk.tzinfo is not None:
-        jam_masuk = jam_masuk.astimezone(wita).time()
-
-    jam_masuk_batas = time(8, 0)  # Jam 08:00 WITA
-
-    if jam_masuk <= jam_masuk_batas:
-        return None  # Tidak terlambat
-
-    # Hitung selisih menit
-    terlambat = (jam_masuk.hour * 60 + jam_masuk.minute) - (jam_masuk_batas.hour * 60 + jam_masuk_batas.minute)
-    return terlambat
-
-def hitung_jam_kurang(jam_keluar):
-    """
-    Menghitung jumlah menit kekurangan jam kerja jika checkout sebelum jam 17:00.
-    :param jam_keluar: string format "HH:MM:SS" atau datetime.time
-    :return: int (jumlah menit) atau None jika tidak ada kekurangan
-    """
-    waktu_ideal_pulang = time(17, 0)  # 17:00:00
-
-    # Deteksi dan konversi string jika diperlukan
-    if isinstance(jam_keluar, str):
+@absensi_ns.route('/check-in/<int:id_karyawan>')
+class AbsensiCheckInResource(Resource):
+    @role_required('karyawan')
+    @absensi_ns.expect(upload_parser)
+    @absensi_ns.response(200, 'Check-in berhasil')
+    @absensi_ns.response(400, 'Data tidak lengkap atau tidak valid')
+    @absensi_ns.response(403, 'Diluar lokasi kerja atau wajah tidak cocok')
+    def post(self, id_karyawan):
+        """Akses: (karyawan), Check-in karyawan berdasarkan lokasi dan foto"""
         try:
-            jam_keluar_obj = datetime.strptime(jam_keluar, "%H:%M:%S").time()
+            args = upload_parser.parse_args()
+            image = args['file']
+            user_lat = args['latitude']
+            user_lon = args['longitude']
+            
+            if image.filename == '':
+                return {'error': 'Anda belum memasukkan gambar!'}, 400
+
+            try:
+                user_lat = float(user_lat)
+                user_lon = float(user_lon)
+            except ValueError:
+                return {'error': 'Format koordinat salah!'}, 400
+
+            lokasi_absensi = get_valid_office_name(user_lat, user_lon)
+
+            if lokasi_absensi is None:
+                if is_wfh_allowed(id_karyawan):
+                    lokasi_absensi = "WFH"
+                else:
+                    return {'status': 'error', 'message': 'Anda berada diluar lokasi kerja'}, 403
+
+            # Verifikasi wajah
+            face = verifikasi_wajah(id_karyawan, image)
+            if face == "not_detected":
+                return {'status': 'error', 'message': 'Wajah tidak terdeteksi!'}, 400
+            elif face == "error":
+                return {'status': 'error', 'message': 'Gagal memverifikasi wajah.'}, 500
+            elif not face:
+                return {'status': 'error', 'message': 'Wajah tidak cocok!'}, 403
+
+            tanggal, jam_masuk = get_timezone()
+            jam_terlambat = hitung_keterlambatan(jam_masuk)
+
+            add_checkin(id_karyawan, tanggal, jam_masuk, lokasi_absensi, jam_terlambat)
+
+            return {'status': 'Check-in berhasil', 'lokasi': lokasi_absensi}, 200
+        except SQLAlchemyError as e:
+            logging.error(f"Database error: {str(e)}")
+            return {'status': "Internal server error"}, 500
+
+@absensi_ns.route('/check-out/<int:id_karyawan>')
+class AbsensiCheckOutResource(Resource):
+    @absensi_ns.expect(upload_parser)
+    @role_required('karyawan')
+    def put(self, id_karyawan):
+        """Akses: (karyawan), Check-out karyawan berdasarkan lokasi dan foto"""
+        try:
+            args = upload_parser.parse_args()
+            image = args['file']
+            user_lat = args['latitude']
+            user_lon = args['longitude']
+
+            if image.filename == '':
+                return {'status': 'error', 'message': 'Anda belum memasukkan gambar!'}, 400
+
+            try:
+                user_lat = float(user_lat)
+                user_lon = float(user_lon)
+            except ValueError:
+                return {'status': 'error', 'message': f'Format lokasi salah. Latitude: {user_lat}, Longitude: {user_lon}'}, 400
+
+            lokasi_absensi = get_valid_office_name(user_lat, user_lon)
+            if lokasi_absensi is None:
+                if is_wfh_allowed(id_karyawan):
+                    lokasi_absensi = "WFH"
+                else:
+                    return {'status': 'error', 'message': 'Anda berada di luar lokasi kerja yang diizinkan!'}, 403
+
+            face = verifikasi_wajah(id_karyawan, image)
+            if face == "not_detected":
+                return {'status': 'error', 'message': 'Wajah tidak terdeteksi. Pastikan wajah terlihat jelas!'}, 400
+            elif face == "error":
+                return {'status': 'error', 'message': 'Terjadi kesalahan saat memverifikasi wajah.'}, 500
+            elif not face:
+                return {'status': 'error', 'message': 'Wajah tidak sesuai dengan akun!'}, 403
+
+            tanggal, jam_keluar = get_timezone()
+            presensi = get_check_presensi(id_karyawan)
+            if not presensi:
+                return {'status': 'info', 'message': 'Belum ada presensi hari ini'}, 200
+
+            jam_masuk = presensi.get("jam_masuk")
+            if not jam_masuk:
+                return {'status': 'info', 'message': 'Anda belum melakukan check-in'}, 200
+
+            jam_kurang = hitung_jam_kurang(jam_keluar)
+            total_jam_kerja = hitung_waktu_kerja(jam_masuk, jam_keluar)
+
+            result = update_checkout(id_karyawan, tanggal, jam_keluar, lokasi_absensi, jam_kurang, total_jam_kerja)
+            if result is None or result == 0:
+                return {'status': 'error', 'message': 'Gagal mencatat check-out atau tidak ditemukan check-in sebelumnya'}, 500
+
+            return {'status': 'Check-out berhasil', 'lokasi': lokasi_absensi}, 200
+        except SQLAlchemyError as e:
+                logging.error(f"Database error: {str(e)}")
+                return {'status': "Internal server error"}, 500
+
+
+@absensi_ns.route('/delete-check-out/<int:id_absensi>')
+class HapusJamKeluar(Resource):
+    @role_required('karyawan')
+    def delete(self, id_absensi):
+        """Akses: (karyawan), Delete check out berdasarkan ID"""
+        try:
+            deleted = delete_checkout(id_absensi)
+            if not deleted:
+                return {'status': 'error', "message": "Tidak ditemukan atau belum absen pulang"}, 404
+            return {"status": "Absen keluar anda berhasil dihapus"}, 200
+        except SQLAlchemyError as e:
+            logging.error(f"Database error: {str(e)}")
+            return {'status': "Internal server error"}, 500
+
+
+@absensi_ns.route('/history/<int:id_karyawan>')
+class AbsensiHarianPersonalResource(Resource):
+    @role_required('karyawan')
+    @absensi_ns.doc(params={'tanggal': 'Format tanggal DD-MM-YYYY'})
+    def get(self, id_karyawan):
+        """Akses: (karyawan), Lihat riwayat absensi harian karyawan berdasarkan tanggal tertentu"""
+        tanggal_param = request.args.get('tanggal')
+
+        try:
+            if tanggal_param:
+                tanggal_filter = datetime.strptime(tanggal_param, "%d-%m-%Y").date()
+            else:
+                tanggal_filter, _ = get_timezone()
         except ValueError:
-            return None  # Format waktu tidak valid
-    elif isinstance(jam_keluar, time):
-        jam_keluar_obj = jam_keluar
-    else:
-        return None  # Tipe data tidak didukung
+            return {'status': 'Format tanggal tidak valid. Gunakan DD-MM-YYYY'}, 400
 
-    if jam_keluar_obj < waktu_ideal_pulang:
-        delta = datetime.combine(date.today(), waktu_ideal_pulang) - datetime.combine(date.today(), jam_keluar_obj)
-        return int(delta.total_seconds() // 60)
+        result = get_history_absensi_harian(id_karyawan, tanggal_filter)
+        return {'history': result}, 200
+
+@absensi_ns.route('/check/<int:id_karyawan>')
+class CekPresensiResource(Resource):
+    @role_required('karyawan')
+    def get(self, id_karyawan):
+        """Akses: (karyawan), Check presensi karyawan berdasarkan id"""
+        cek_presensi = get_check_presensi(id_karyawan)
+
+        if not cek_presensi:
+            return {"message": "Belum ada presensi"}, 200
+
+        result = {
+            "id_absensi": cek_presensi["id_absensi"],
+            "tanggal": cek_presensi["tanggal"].strftime('%d-%m-%Y'),
+            "jam_masuk": cek_presensi["jam_masuk"].strftime('%H:%M') if cek_presensi["jam_masuk"] else None,
+            "jam_keluar": cek_presensi["jam_keluar"].strftime('%H:%M') if cek_presensi["jam_keluar"] else None,
+            "lokasi_masuk": cek_presensi["lokasi_masuk"],
+            "lokasi_keluar": cek_presensi["lokasi_keluar"],
+            "jam_terlambat": cek_presensi["jam_terlambat"]
+        }
+
+        return result, 200
     
-    return None  # Tidak ada kekurangan
+
+@absensi_ns.route('/hadir')
+class AbsensiHarianAdmin(Resource):
+    @role_required('admin')
+    @absensi_ns.doc(params={'tanggal': 'Format tanggal DD-MM-YYYY'})
+    def get(self):
+        """Akses: (admin), Check karyawan dengan status hadir berdasarkan tanggal"""
+        tanggal_param = request.args.get('tanggal')
+        try:
+            if tanggal_param:
+                tanggal_filter = datetime.strptime(tanggal_param, "%d-%m-%Y").date()
+            else:
+                tanggal_filter, _ = get_timezone()  # default: hari ini
+        except ValueError:
+            return {'status': 'Format tanggal tidak valid. Gunakan DD-MM-YYYY'}, 400
+
+        data = query_absensi_harian_admin(tanggal_filter)
+        return {'absensi': data}, 200
 
 
-"""<-- API Check in & Check out -->"""
-@absensi_bp.route('/absensi/<int:id_karyawan>', methods=['POST'])
-@role_required('karyawan')
-def check_in(id_karyawan):
-    # Periksa apakah file gambar ada dalam request
-    if 'file' not in request.files:
-        return jsonify({'error': 'Tidak ada foto yang anda masukkan!'}), 400
-    
-    # Periksa apakah koordinat lokasi ada dalam request
-    user_lat = request.form.get('latitude')  # Ambil dari form-data
-    user_lon = request.form.get('longitude')  # Ambil dari form-data
+@absensi_ns.route('/tidak-hadir')
+class AbsensiTidakHadir(Resource):
+    @role_required('admin')
+    @absensi_ns.doc(params={'tanggal': 'Format tanggal DD-MM-YYYY'})
+    def get(self):
+        """Akses: (admin), Check karyawan dengan status tidak hadir berdasarkan tanggal"""
+        tanggal_param = request.args.get('tanggal')
 
-    if not user_lat or not user_lon:
-        return jsonify({'error': 'Anda belum memberikan lokasi!'}), 400
+        try:
+            if tanggal_param:
+                tanggal_filter = datetime.strptime(tanggal_param, "%d-%m-%Y").date()
+            else:
+                tanggal_filter, _ = get_timezone()
+        except ValueError:
+            return {'status': 'Format tanggal tidak valid. Gunakan DD-MM-YYYY'}, 400
 
-    # Konversi latitude dan longitude ke float
-    try:
-        user_lat = float(user_lat)
-        user_lon = float(user_lon)
-    except ValueError:
-        return jsonify({'error': f'Format data lokasi anda salah. Latitude: {user_lat}, Longitude: {user_lon}'}), 400
+        data = query_absensi_tidak_hadir(tanggal_filter)
+        return {'absensi': data}, 200
 
-    # Cek apakah user dalam radius lokasi yang diizinkan
-    lokasi_absensi = get_valid_office_name(user_lat, user_lon)
 
-    if lokasi_absensi is None:
-        # Tidak berada di kantor, cek apakah WFH diperbolehkan
-        if is_wfh_allowed(id_karyawan):
-            lokasi_absensi = "WFH"
+@absensi_ns.route('/edit/<int:id_absensi>')
+class EditAbsensi(Resource):
+    @absensi_ns.expect(edit_absensi_model)
+    @role_required('admin')
+    def put(self, id_absensi):
+        """Akses: (admin), Edit data presensi karyawan"""
+        data = request.json
+        jam_masuk = data.get("jam_masuk")
+        jam_keluar = data.get("jam_keluar")
+        lokasi_masuk = data.get("lokasi_masuk")
+        lokasi_keluar = data.get("lokasi_keluar")
+
+        # Validasi format waktu
+        def is_valid_time_format(t):
+            return bool(re.match(r"^\d{2}:\d{2}$", t))
+
+        if not jam_masuk:
+            return {'status': 'Jam masuk wajib diisi'}, 400
+        if not is_valid_time_format(jam_masuk):
+            return {'status': 'Format jam masuk tidak valid. Gunakan format HH:MM'}, 400
+        if jam_keluar and not is_valid_time_format(jam_keluar):
+            return {'status': 'Format jam keluar tidak valid. Gunakan format HH:MM'}, 400
+
+        # Hitung nilai turunan
+        if not jam_keluar:
+            jam_keluar = None
+            jam_kurang = None
+            total_jam_kerja = None
         else:
-            return jsonify({'status': 'error', 'message': 'Anda berada diluar lokasi kerja, lakukan absensi di lokasi yang sudah ditentukan!'}), 403
+            total_jam_kerja = hitung_waktu_kerja(
+                datetime.strptime(jam_masuk, "%H:%M").time(),
+                datetime.strptime(jam_keluar, "%H:%M").time()
+            )
+            jam_kurang = hitung_jam_kurang(datetime.strptime(jam_keluar, "%H:%M").time())
 
-    # Upload file
-    image = request.files['file']
+        jam_terlambat = hitung_keterlambatan(datetime.strptime(jam_masuk, "%H:%M").time())
 
-    # Periksa apakah file memiliki nama
-    if image.filename == '':
-        return jsonify({'error': 'Anda belum memasukkan gambar!'}), 400
-    
-    # Verifikasi wajah
-    face = verifikasi_wajah(id_karyawan, image)
-    
-    if face == "not_detected":
-        return jsonify({'status': 'error', 'message': 'Wajah tidak terdeteksi dalam gambar. Pastikan wajah terlihat jelas!'}), 400
-    elif face == "error":
-        return jsonify({'status': 'error', 'message': 'Terjadi kesalahan saat memverifikasi wajah.'}), 500
-    elif not face:
-        return jsonify({'status': 'error', 'message': 'Wajah anda tidak sesuai dengan akun!'}), 403
-
-    tanggal, jam_masuk = get_timezone()
-    jam_terlambat = hitung_keterlambatan(jam_masuk)
-
-    # Menambahkan check-in
-    result = add_checkin(id_karyawan, tanggal, jam_masuk, lokasi_absensi, jam_terlambat)
-    if result is None:
-        return jsonify({'status': 'error', 'message': 'Data yang anda masukkan belum lengkap!'}), 500
-    
-    return jsonify({'status': 'Check-in succeeded', 'lokasi': lokasi_absensi}), 200
-
-@absensi_bp.route('/absensi/<int:id_karyawan>', methods=['PUT'])
-@role_required('karyawan')
-def check_out(id_karyawan):
-    # Periksa apakah file gambar ada dalam request
-    if 'file' not in request.files:
-        return jsonify({'error': 'Tidak ada foto yang anda masukkan!'}), 400
-
-    # Ambil latitude dan longitude dari form-data
-    user_lat = request.form.get('latitude')
-    user_lon = request.form.get('longitude')
-
-    if not user_lat or not user_lon:
-        return jsonify({'error': 'Anda belum memberikan lokasi!'}), 400
-
-    # Konversi koordinat ke float
-    try:
-        user_lat = float(user_lat)
-        user_lon = float(user_lon)
-    except ValueError:
-        return jsonify({'error': f'Format data lokasi anda salah. Latitude: {user_lat}, Longitude: {user_lon}'}), 400
-
-    # Cek apakah user dalam radius lokasi yang diizinkan
-    lokasi_absensi = get_valid_office_name(user_lat, user_lon)
-
-    if lokasi_absensi is None:
-        # Jika tidak di lokasi kantor, cek apakah diperbolehkan WFH
-        if is_wfh_allowed(id_karyawan):
-            lokasi_absensi = "WFH"
-        else:
-            return jsonify({'status': 'error', 'message': 'Anda berada diluar lokasi kerja, lakukan absensi di lokasi yang sudah ditentukan!'}), 403
-        
-    # Upload file
-    image = request.files['file']
-
-    # Periksa apakah file memiliki nama
-    if image.filename == '':
-        return jsonify({'error': 'Anda belum memasukkan gambar!'}), 400
-    
-    # Verifikasi wajah
-    face = verifikasi_wajah(id_karyawan, image)
-
-    if face == "not_detected":
-        return jsonify({'status': 'error', 'message': 'Wajah tidak terdeteksi dalam gambar. Pastikan wajah terlihat jelas!'}), 400
-    elif face == "error":
-        return jsonify({'status': 'error', 'message': 'Terjadi kesalahan saat memverifikasi wajah.'}), 500
-    elif not face:
-        return jsonify({'status': 'error', 'message': 'Wajah anda tidak sesuai dengan akun!'}), 403
-
-    tanggal, jam_keluar = get_timezone()
-
-    cek_presensi = get_check_presensi(id_karyawan)
-    if not cek_presensi:
-        return {"message": "Belum ada presensi"}, 200
-
-    jam_masuk = cek_presensi.get("jam_masuk")
-    if not jam_masuk:
-        return {"message": "Belum ada jam masuk"}, 200
-
-    jam_kurang = hitung_jam_kurang(jam_keluar)
-    total_jam_kerja = hitung_waktu_kerja(jam_masuk, jam_keluar)
-
-    # Update jam keluar
-    result = update_checkout(id_karyawan, tanggal, jam_keluar, lokasi_absensi, jam_kurang, total_jam_kerja)
-    if result is None or result == 0:
-        return jsonify({'status': 'error', 'message': 'Gagal mencatat absen pulang atau tidak ditemukan absen masuk sebelumnya'}), 500
-    
-    return jsonify({'status': 'Absen pulang berhasil', 'lokasi': lokasi_absensi}), 200
-
-@absensi_bp.route('/absensi/delete_jam_masuk/<int:id_absensi>', methods=['PUT'])
-@role_required('karyawan')
-def hapus_absen_terlanjur_keluar(id_absensi):
-    try:
-        result = hapus_absen_keluar(id_absensi)
-        if result is None or result == 0:
-            return {'status': "Gagal menghapus jam keluar"}, 500
-        return {'status': "Berhasil menghapus jam keluar"}, 200
-    except Exception as e:
-        return {'status': f"Terjadi kesalahan: {str(e)}"}, 500
-    
-@absensi_bp.route('/absensi/history/<int:id_karyawan>', methods=['GET'])
-@role_required('karyawan')
-def absensi_harian_personal(id_karyawan):
-    tanggal_param = request.args.get('tanggal')  # Ambil query param ?tanggal=DD-MM-YYYY
-
-    try:
-        if tanggal_param:
-            tanggal_filter = datetime.strptime(tanggal_param, "%d-%m-%Y").date()
-        else:
-            tanggal_filter, _ = get_timezone()  # default: hari ini
-    except ValueError:
-        return {'status': 'Format tanggal tidak valid. Gunakan DD-MM-YYYY'}, 400
-
-    absensi_harian = get_absensi_harian(id_karyawan, tanggal_filter)
-    result = []
-
-    JAM_ISTIRAHAT = 60  # 1 jam istirahat dalam menit
-    BATAS_MAKS_MENIT_PER_HARI = 480  # 8 jam kerja efektif per hari
-
-    for row in absensi_harian:
-        # Konversi nilai-nilai nullable ke default agar tidak error saat dihitung
-        jam_terlambat = row['jam_terlambat'] or 0
-        jam_kurang_db = row['jam_kurang'] or 0
-        jam_bolos = jam_kurang_db
-        jam_kurang_total = jam_terlambat + jam_kurang_db
-        gaji_pokok = row['gaji_pokok']
-
-        # Hitung tarif per menit dan batas maksimal gaji harian
-        tarif_per_menit = gaji_pokok / 12480  # 26 hari x 8 jam x 60 menit = 12480 menit/bulan
-        gaji_maks_harian = tarif_per_menit * BATAS_MAKS_MENIT_PER_HARI
-        potongan = tarif_per_menit * jam_kurang_total
-
-        # Hitung waktu kerja efektif setelah dikurangi istirahat (jika ada jam keluar)
-        total_jam_kerja = row['total_jam_kerja'] or 0
-        waktu_kerja_efektif = max(0, total_jam_kerja - JAM_ISTIRAHAT)
-
-        if row['jam_keluar']:
-            total_gaji_harian = max(0, min(waktu_kerja_efektif, BATAS_MAKS_MENIT_PER_HARI) * tarif_per_menit - potongan)
-        else:
-            total_gaji_harian = 0
-
-        result.append({
-            'id_karyawan': row['id_karyawan'],
-            'nama': row['nama'],
-            'status_presensi': row.get('nama_status'),
-            'id_tipe': row['id_tipe'],
-            'tipe': row['tipe'],
-            'tanggal': row['tanggal'].strftime("%d-%m-%Y"),
-            'jam_masuk': row['jam_masuk'].strftime('%H:%M') if row['jam_masuk'] else None,
-            'jam_keluar': row['jam_keluar'].strftime('%H:%M') if row['jam_keluar'] else None,
-            'jam_terlambat': jam_terlambat,
-            'jam_bolos': jam_bolos,
-            'jam_kurang': jam_kurang_total,
-            'total_jam_kerja': total_jam_kerja,
-            'lokasi_masuk': row['lokasi_masuk'],
-            'lokasi_keluar': row['lokasi_keluar'],
-            'gaji_pokok': round(gaji_pokok),
-            'tarif_per_menit': round(tarif_per_menit),
-            'gaji_maks_harian': round(gaji_maks_harian),
-            'potongan': round(potongan),
-            'total_gaji_harian': round(total_gaji_harian),
-        })
-
-    return {'history': result}, 200
-
-    
-
-"""<-- Get Presensi -->"""
-@absensi_bp.route('/absensi/hadir', methods=['GET'])
-@role_required('admin')
-def absensi():
-    tanggal_param = request.args.get('tanggal')  # Ambil query param ?tanggal=DD-MM-YYYY
-
-    try:
-        if tanggal_param:
-            tanggal_filter = datetime.strptime(tanggal_param, "%d-%m-%Y").date()
-        else:
-            tanggal_filter, _ = get_timezone()  # default: hari ini
-    except ValueError:
-        return {'status': 'Format tanggal tidak valid. Gunakan DD-MM-YYYY'}, 400
-
-    list_absensi = get_list_absensi(tanggal_filter)
-    result = [{
-        'id': index + 1,
-        'id_absensi': row['id_absensi'],
-        'id_karyawan': row['id_karyawan'],
-        'nama': row['nama'],
-        'id_jenis': row['id_jenis'],
-        'jenis': row['jenis'],
-        'tanggal': row['tanggal'].strftime("%d-%m-%Y"),
-        'jam_masuk': row['jam_masuk'].strftime('%H:%M') if row['jam_masuk'] else None,
-        'jam_keluar': row['jam_keluar'].strftime('%H:%M') if row['jam_keluar'] else None,
-        'jam_terlambat': row['jam_terlambat'],
-        'jam_kurang': row['jam_kurang'],
-        'total_jam_kerja': row['total_jam_kerja'],
-        'lokasi_masuk': row['lokasi_masuk'] if row['lokasi_masuk'] else None,
-        'lokasi_keluar': row['lokasi_keluar'] if row['lokasi_keluar'] else None,
-        'id_presensi': row['id_presensi'],
-        'status_presensi': row['status_presensi'],
-        'status_absen': (
-            'Belum Check-in' if row['jam_masuk'] is None else
-            'Belum Check-out' if row['jam_keluar'] is None else
-            'Selesai bekerja'
+        result = update_absensi_by_id(
+            id_absensi=id_absensi,
+            jam_masuk=jam_masuk,
+            jam_keluar=jam_keluar,
+            jam_terlambat=jam_terlambat,
+            jam_kurang=jam_kurang,
+            total_jam_kerja=total_jam_kerja,
+            lokasi_masuk=lokasi_masuk,
+            lokasi_keluar=lokasi_keluar
         )
-    } for index, row in enumerate(list_absensi)]
-    
-    return {'absensi': result}, 200
 
-@absensi_bp.route('/absensi/tidak_hadir', methods=['GET'])
-@role_required('admin')
-def absensi_tidak_hadir():
-    tanggal_param = request.args.get('tanggal')  # Ambil query param ?tanggal=DD-MM-YYYY
+        if result is None:
+            return {'status': 'Terjadi kesalahan saat memperbarui data'}, 500
+        if result == 0:
+            return {'status': 'Data tidak ditemukan atau tidak berhasil diperbarui'}, 404
 
-    try:
-        if tanggal_param:
-            tanggal_filter = datetime.strptime(tanggal_param, "%d-%m-%Y").date()
-        else:
-            tanggal_filter, _ = get_timezone()
-    except ValueError:
-        return {'status': 'Format tanggal tidak valid. Gunakan DD-MM-YYYY'}, 400
+        return {'status': 'Data absensi berhasil diperbarui'}, 200
 
-    list_tidak_hadir = get_list_tidak_hadir(tanggal_filter)
 
-    result = [{
-        "id": index + 1,
-        "id_karyawan": row["id_karyawan"],
-        "nama": row["nama"],
-        "id_jenis": row["id_jenis"],
-        "jenis": row["jenis"],
-        'tanggal': row['tanggal'].strftime("%d-%m-%Y"),
-        "status_absen": "Tanpa Keterangan"
-    } for index, row in enumerate(list_tidak_hadir)]
-    
-    return {'absensi': result}, 200
-
-@absensi_bp.route('/absensi/edit/<int:id_absensi>', methods=['PUT'])
-@role_required('admin')
-def edit_absensi(id_absensi):
-    data = request.json
-    jam_masuk = data.get("jam_masuk")
-    jam_keluar = data.get("jam_keluar")
-
-    # Validasi format waktu HH:MM
-    def is_valid_time_format(t):
-        return bool(re.match(r"^\d{2}:\d{2}$", t))
-
-    if not jam_masuk:
-        return {'status': 'Jam masuk wajib diisi'}, 400
-    if not is_valid_time_format(jam_masuk):
-        return {'status': 'Format jam masuk tidak valid. Gunakan format HH:MM'}, 400
-    if jam_keluar and not is_valid_time_format(jam_keluar):
-        return {'status': 'Format jam keluar tidak valid. Gunakan format HH:MM'}, 400
-
-    # Jika jam_keluar berupa string kosong, perlakukan sebagai None
-    if jam_keluar == "" or jam_keluar == None:
-        jam_keluar = None
-        jam_kurang = None
-        total_jam_kerja = None
-    else:
-        total_jam_kerja = hitung_waktu_kerja(
-            datetime.strptime(jam_masuk, "%H:%M").time(),
-            datetime.strptime(jam_keluar, "%H:%M").time()
-        )
-        jam_kurang = hitung_jam_kurang(datetime.strptime(jam_keluar, "%H:%M").time())
-
-    jam_terlambat = hitung_keterlambatan(datetime.strptime(jam_masuk, "%H:%M").time())
-
-    result = update_absensi_times(id_absensi, jam_masuk, jam_keluar, jam_terlambat, jam_kurang, total_jam_kerja)
-
-    if result is None:
-        return {'status': 'Terjadi kesalahan saat memperbarui data'}, 500
-    if result == 0:
-        return {'status': 'Data tidak ditemukan atau tidak berhasil diperbarui'}, 404
-
-    return {'status': 'Data absensi berhasil diperbarui'}, 200
-
-@absensi_bp.route('/absensi/delete/<int:id_absensi>', methods=['DELETE'])
-@role_required('admin')
-def delete_absensi(id_absensi):
-    try:
-        result = remove_abseni(id_absensi)
-        if result is None or result == 0:
-            return {'status': "Gagal menghapus absensi"}, 500
-        return {'status': "Berhasil menghapus absensi"}, 200
-    except Exception as e:
-        return {'status': f"Terjadi kesalahan: {str(e)}"}, 500
+@absensi_ns.route('/delete/<int:id_absensi>')
+class HapusAbsensi(Resource):
+    @absensi_ns.response(200, 'Berhasil menghapus absensi')
+    @absensi_ns.response(404, 'Absensi tidak ditemukan')
+    @absensi_ns.response(500, 'Terjadi kesalahan saat menghapus data')
+    @role_required('admin')
+    def delete(self, id_absensi):
+        """Akses: (admin), Delete data presensi karyawan"""
+        try:
+            result = remove_absensi(id_absensi)
+            if result is None:
+                return {'status': "Terjadi kesalahan saat menghapus absensi"}, 500
+            if result == 0:
+                return {'status': "Absensi tidak ditemukan"}, 404
+            return {'status': "Berhasil menghapus absensi"}, 200
+        except Exception as e:
+            return {'status': f"Terjadi kesalahan: {str(e)}"}, 500
