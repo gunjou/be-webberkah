@@ -17,7 +17,16 @@ def get_connection():
     username = os.getenv("DB_USER")
     password = os.getenv("DB_PASS")
 
-    return create_engine(f'postgresql+psycopg2://{username}:{password}@{host}:{port}/{dbname}')
+    # return create_engine(f'postgresql+psycopg2://{username}:{password}@{host}:{port}/{dbname}')
+    # Tambah parameter pool_size, max_overflow, pool_timeout, pool_recycle
+    engine = create_engine(
+        f'postgresql+psycopg2://{username}:{password}@{host}:{port}/{dbname}',
+        pool_size=10,          # jumlah koneksi tetap dalam pool
+        max_overflow=5,        # jumlah koneksi tambahan saat pool penuh
+        pool_timeout=30,       # waktu tunggu saat pool penuh (detik)
+        pool_recycle=1800      # recycle koneksi setiap 30 menit agar tidak timeout
+    )
+    return engine
 
 # === Mencari Timestamp WITA === #
 def get_wita():
