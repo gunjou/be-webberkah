@@ -19,10 +19,14 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     R = 6371000  # Radius bumi dalam meter
     return R * c
 
-def get_valid_office_name(user_lat, user_lon):
+def get_valid_office_name(user_lat, user_lon, id_jenis):
     for office in OFFICE_LOCATIONS:
+        # Pegawai lapangan tidak boleh check-in di Kantor Perampuan
+        if id_jenis == 5 and office["name"] == "Kantor Perampuan":
+            continue
+        
         distance = calculate_distance(user_lat, user_lon, office["lat"], office["lon"])
-        allowed_radius = office.get("radius", 50)  # fallback default radius 50
+        allowed_radius = office.get("radius", 50)
         if distance <= allowed_radius:
             return office["name"]
-    return None  # Tidak ada lokasi yang cocok
+    return None

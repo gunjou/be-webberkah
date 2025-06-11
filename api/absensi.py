@@ -1,6 +1,7 @@
 from datetime import datetime
 import re
-from flask import request, logging
+import logging
+from flask import request
 from flask_restx import Namespace, Resource, fields
 from werkzeug.datastructures import FileStorage
 from sqlalchemy.exc import SQLAlchemyError
@@ -52,7 +53,11 @@ class AbsensiCheckInResource(Resource):
             except ValueError:
                 return {'error': 'Format koordinat salah!'}, 400
 
-            lokasi_absensi = get_valid_office_name(user_lat, user_lon)
+            id_jenis = get_jenis_karyawan(id_karyawan)
+            if id_jenis is None:
+                return {'status': 'error', 'message': 'Karyawan tidak ditemukan'}, 404
+
+            lokasi_absensi = get_valid_office_name(user_lat, user_lon, id_jenis)
 
             if lokasi_absensi is None:
                 if is_wfh_allowed(id_karyawan):
@@ -100,7 +105,12 @@ class AbsensiCheckOutResource(Resource):
             except ValueError:
                 return {'status': 'error', 'message': f'Format lokasi salah. Latitude: {user_lat}, Longitude: {user_lon}'}, 400
 
-            lokasi_absensi = get_valid_office_name(user_lat, user_lon)
+            id_jenis = get_jenis_karyawan(id_karyawan)
+            if id_jenis is None:
+                return {'status': 'error', 'message': 'Karyawan tidak ditemukan'}, 404
+
+            lokasi_absensi = get_valid_office_name(user_lat, user_lon, id_jenis)
+
             if lokasi_absensi is None:
                 if is_wfh_allowed(id_karyawan):
                     lokasi_absensi = "WFH"

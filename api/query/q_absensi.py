@@ -18,6 +18,13 @@ def is_wfh_allowed(id_karyawan):
         print(f"Error checking WFH status: {str(e)}")
         return False
     
+def get_jenis_karyawan(id_karyawan):
+    result = connection.execute(
+        text("SELECT id_jenis FROM karyawan WHERE id_jenis = :id_karyawan AND status = 1"),
+        {"id_karyawan": id_karyawan}
+    ).mappings().fetchone()
+    return result["id_jenis"] if result else None
+    
 def add_checkin(id_karyawan, tanggal, jam_masuk, lokasi_absensi, jam_terlambat):
     try:
         result = connection.execute(

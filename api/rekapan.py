@@ -3,7 +3,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime, date, timedelta
 import calendar
 from .utils.decorator import role_required
-from .query.q_rekapan import get_list_rekapan_person, get_rekap_absensi
+from .query.q_rekapan import get_list_rekapan_person, get_rekap_absensi, get_rekap_person
 
 rekapan_ns = Namespace('rekapan', description='Rekap Absensi')
 
@@ -27,9 +27,9 @@ def format_jam_menit(menit):
 @rekapan_ns.route('/absensi')
 class RekapAbsensi(Resource):
     @rekapan_ns.expect(rekap_absensi_parser)
-    @jwt_required()
+    @role_required('admin')
     def get(self):
-        """Akses: (admin, karyawan), Mengambil rekapan absensi semua pegawai berdasarkan periode tertentu"""
+        """Akses: (admin), Mengambil rekapan absensi semua pegawai berdasarkan periode tertentu"""
         args = rekap_absensi_parser.parse_args()
         start_param = args.get('start')
         end_param = args.get('end')
@@ -75,8 +75,63 @@ class RekapAbsensi(Resource):
         }, 200
 
 
-@rekapan_ns.route('/person')
-class RekapAbsensiPerson(Resource):
+@rekapan_ns.route('/rekap')
+class RekapBulananPerson(Resource):
+    @rekapan_ns.expect(rekap_absensi_parser)  # pastikan parser hanya ambil `tanggal`
+    @role_required('karyawan')
+    def get(self):
+        """Akses: (karyawan), Rekap absensi 1 bulan berdasarkan tanggal yang diberikan"""
+        args = rekap_absensi_parser.parse_args()
+        tanggal_param = args.get('tanggal')  # contoh: '10-06-2025'
+        id_karyawan = get_jwt_identity()
+
+        try:
+            if tanggal_param:
+                tanggal = datetime.strptime(tanggal_param, "%d-%m-%Y").date()
+            else:
+                tanggal = date.today()
+        except ValueError:
+            return {'status': 'Format tanggal tidak valid. Gunakan format DD-MM-YYYY'}, 400
+
+        # Dapatkan range awal & akhir bulan dari tanggal yang diberikan
+        start = date(tanggal.year, tanggal.month, 1)
+        end_hari = calendar.monthrange(tanggal.year, tanggal.month)[1]
+        end = min(date(tanggal.year, tanggal.month, end_hari), date.today())  # maksimal hari ini
+
+        data = get_rekap_person(start, end, id_karyawan)
+
+        # Hitung hari kerja valid (Senin - Sabtu)
+        hari_valid = sum(1 for i in range((end - start).days + 1)
+                         if (start + timedelta(days=i)).weekday() != 6)  # exclude Sunday
+
+        # Ambil hanya 1 data (untuk 1 karyawan)
+        if data:
+            row = data[0]
+
+            jumlah_status_valid = (
+                row.get('jumlah_hadir', 0) +
+                row.get('jumlah_sakit', 0) +
+                row.get('jumlah_izin', 0) +
+                row.get('jumlah_setengah_hari', 0) +
+                row.get('dinas_luar', 0)
+            )
+            jumlah_alpha = hari_valid - jumlah_status_valid
+            row['jumlah_alpha'] = max(jumlah_alpha, 0)
+
+            return {
+                'tanggal_start': start.strftime("%d-%m-%Y"),
+                'tanggal_end': end.strftime("%d-%m-%Y"),
+                'rekap': row  # bukan lagi list
+            }, 200
+        else:
+            return {
+                "message": "Data tidak ditemukan",
+                "data": None
+            }, 404
+
+    
+@rekapan_ns.route('/list')
+class RekapAbsensiList(Resource):
     @rekapan_ns.expect(rekap_absensi_parser)
     @jwt_required()
     def get(self):
