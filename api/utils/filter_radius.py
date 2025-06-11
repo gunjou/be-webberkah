@@ -8,6 +8,11 @@ OFFICE_LOCATIONS = [
     # {"name": "Rumah", "lat": -8.639975671029253, "lon": 116.0940286392315, "radius": 50},
 ]
 
+FIELD_LOCATIONS = [
+    {"name": "Gudang GM", "lat": -8.674641, "lon": 116.086079, "radius": 50},
+    {"name": "PLTG Jeranjang", "lat": -8.659109142146225, "lon": 116.07298164266732, "radius": 300}  # radius lebih besar
+]
+
 def calculate_distance(lat1, lon1, lat2, lon2):
     """Menghitung jarak antara dua titik koordinat menggunakan Haversine Formula"""
     lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
@@ -20,13 +25,17 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     return R * c
 
 def get_valid_office_name(user_lat, user_lon, id_jenis):
-    for office in OFFICE_LOCATIONS:
-        # Pegawai lapangan tidak boleh check-in di Kantor Perampuan
-        if id_jenis == 5 and office["name"] == "Kantor Perampuan":
-            continue
-        
-        distance = calculate_distance(user_lat, user_lon, office["lat"], office["lon"])
-        allowed_radius = office.get("radius", 50)
-        if distance <= allowed_radius:
-            return office["name"]
-    return None
+    if id_jenis == 5: # khusus pegawai lapangan
+        for office in FIELD_LOCATIONS:
+            distance = calculate_distance(user_lat, user_lon, office["lat"], office["lon"])
+            allowed_radius = office.get("radius", 50)  # fallback default radius 50
+            if distance <= allowed_radius:
+                return office["name"]
+        return None  # Tidak ada lokasi yang cocok
+    else:
+        for office in OFFICE_LOCATIONS:
+            distance = calculate_distance(user_lat, user_lon, office["lat"], office["lon"])
+            allowed_radius = office.get("radius", 50)  # fallback default radius 50
+            if distance <= allowed_radius:
+                return office["name"]
+        return None  # Tidak ada lokasi yang cocok
