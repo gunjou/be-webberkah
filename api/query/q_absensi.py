@@ -82,6 +82,43 @@ def update_checkout(id_karyawan, tanggal, jam_keluar, lokasi_absensi, jam_kurang
         print(f"Error occurred: {str(e)}")
         return None
     
+def add_absensi(id_karyawan, tanggal, jam_masuk, jam_keluar, lokasi_masuk, lokasi_keluar, jam_terlambat, jam_kurang, total_jam_kerja):
+    try:
+        connection.execute(
+            text("""
+                INSERT INTO Absensi (
+                    id_karyawan, tanggal, jam_masuk, jam_keluar, 
+                    lokasi_masuk, lokasi_keluar, jam_terlambat,
+                    jam_kurang, total_jam_kerja,
+                    created_at, updated_at, status, id_status
+                ) 
+                VALUES (
+                    :id_karyawan, :tanggal, :jam_masuk, :jam_keluar, 
+                    :lokasi_masuk, :lokasi_keluar, :jam_terlambat,
+                    :jam_kurang, :total_jam_kerja,
+                    :timestamp_wita, :timestamp_wita, 1, 1
+                )
+            """),
+            {
+                "id_karyawan": id_karyawan,
+                "tanggal": tanggal,
+                "jam_masuk": jam_masuk,
+                "jam_keluar": jam_keluar,
+                "lokasi_masuk": lokasi_masuk,
+                "lokasi_keluar": lokasi_keluar,
+                "jam_terlambat": jam_terlambat,
+                "jam_kurang": jam_kurang,
+                "total_jam_kerja": total_jam_kerja,
+                "timestamp_wita": timestamp_wita
+            }
+        )
+        connection.commit()
+        return 1
+    except SQLAlchemyError as e:
+        connection.rollback()
+        print(f"Error occurred: {str(e)}")
+        return None
+    
 def delete_checkout(id_absensi):
     try:
         result = connection.execute(

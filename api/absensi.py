@@ -29,6 +29,73 @@ edit_absensi_model = absensi_ns.model('EditAbsensi', {
     'lokasi_keluar': fields.String(required=False, description='Nama lokasi keluar (dipilih dari dropdown)')
 })
 
+add_absensi_model = absensi_ns.model('AddAbsensi', {
+    'tanggal': fields.String(required=True, description='Tanggal (YYYY-MM-DD)'),
+    'jam_masuk': fields.String(required=True, description='Jam masuk (HH:MM)'),
+    'jam_keluar': fields.String(required=False, description='Jam keluar (HH:MM), boleh kosong/null'),
+    'lokasi_masuk': fields.String(required=True, description='Nama lokasi masuk (dipilih dari dropdown)'),
+    'lokasi_keluar': fields.String(required=False, description='Nama lokasi keluar (dipilih dari dropdown)'),
+})
+
+
+@absensi_ns.route('/add/<int:id_karyawan>')
+class AddAbsensiResource(Resource):
+    @role_required('admin')
+    @absensi_ns.expect(add_absensi_model)
+    def post(self, id_karyawan):
+        """Akses: (admin), add Absensi karyawan manual oleh admin"""
+        data = request.json
+        tanggal = data.get("tanggal")
+        jam_masuk = data.get("jam_masuk")
+        jam_keluar = data.get("jam_keluar")
+        lokasi_masuk = data.get("lokasi_masuk")
+        lokasi_keluar = data.get("lokasi_keluar")
+        
+        # Validasi format waktu
+        def is_valid_time_format(t):
+            return bool(re.match(r"^\d{2}:\d{2}$", t))
+        
+        if not jam_masuk:
+            return {'status': 'Jam masuk wajib diisi'}, 400
+        if not is_valid_time_format(jam_masuk):
+            return {'status': 'Format jam masuk tidak valid. Gunakan format HH:MM'}, 400
+        if jam_keluar and not is_valid_time_format(jam_keluar):
+            return {'status': 'Format jam keluar tidak valid. Gunakan format HH:MM'}, 400
+
+        # Hitung nilai turunan
+        if not jam_keluar:
+            jam_keluar = None
+            jam_kurang = None
+            total_jam_kerja = None
+        else:
+            total_jam_kerja = hitung_waktu_kerja(
+                datetime.strptime(jam_masuk, "%H:%M").time(),
+                datetime.strptime(jam_keluar, "%H:%M").time()
+            )
+            jam_kurang = hitung_jam_kurang(datetime.strptime(jam_keluar, "%H:%M").time())
+
+        jam_terlambat = hitung_keterlambatan(datetime.strptime(jam_masuk, "%H:%M").time())
+
+        result = add_absensi(
+            id_karyawan=id_karyawan,
+            tanggal=tanggal,
+            jam_masuk=jam_masuk,
+            jam_keluar=jam_keluar,
+            lokasi_masuk=lokasi_masuk,
+            lokasi_keluar=lokasi_keluar,
+            jam_terlambat=jam_terlambat,
+            jam_kurang=jam_kurang,
+            total_jam_kerja=total_jam_kerja
+        )
+
+        if result is None:
+            return {'status': 'Terjadi kesalahan saat menambahkan absensi'}, 500
+        if result == 0:
+            return {'status': 'Data tidak ditemukan atau tidak berhasil ditambahkan'}, 404
+
+        return {'status': 'Data absensi berhasil ditambahkan'}, 200
+
+
 @absensi_ns.route('/check-in/<int:id_karyawan>')
 class AbsensiCheckInResource(Resource):
     @role_required('karyawan')
