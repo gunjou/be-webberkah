@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from sqlalchemy.sql import text
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -15,13 +15,13 @@ def get_daftar_izin(status_izin=None, id_karyawan=None):
     try:
         with engine.connect() as connection:
             query = """
-                SELECT i.id_izin, i.id_karyawan, k.nama AS nama_karyawan, j.nama_jenis, 
+                SELECT i.id_izin, i.id_karyawan, k.nama AS nama_karyawan, j.nama_status, 
                     i.keterangan, i.tgl_mulai, i.tgl_selesai, 
                     i.path_lampiran, i.status_izin, i.alasan_penolakan,
                     i.created_at, i.updated_at
                 FROM izin i
                 JOIN karyawan k ON i.id_karyawan = k.id_karyawan
-                JOIN jenis_izin j ON i.id_jenis = j.id_jenis
+                JOIN statuspresensi j ON i.id_jenis = j.id_status
                 WHERE i.status = 1
             """
             params = {}
@@ -36,7 +36,19 @@ def get_daftar_izin(status_izin=None, id_karyawan=None):
             query += " ORDER BY i.created_at DESC"
 
             result = connection.execute(text(query), params).mappings().fetchall()
-            return [dict(row) for row in result]
+
+            data = []
+            for row in result:
+                row_dict = {}
+                for key, value in row.items():
+                    if isinstance(value, (date, datetime)):
+                        row_dict[key] = value.isoformat()
+                    else:
+                        row_dict[key] = value
+                data.append(row_dict)
+
+            return data
+
     except SQLAlchemyError as e:
         print(f"DB Error: {str(e)}")
         return None

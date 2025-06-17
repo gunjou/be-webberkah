@@ -82,7 +82,7 @@ class PengajuanIzinResource(Resource):
 
     @role_required('admin')
     @izin_ns.doc(params={
-        'status_izin': 'Filter berdasarkan status izin (pending, disetujui, ditolak)',
+        'status_izin': 'Filter berdasarkan status izin (pending, approved, rejected)',
         'id_karyawan': 'Filter berdasarkan ID karyawan'
     })
     def get(self):
