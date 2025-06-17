@@ -9,24 +9,26 @@ from sqlalchemy import create_engine
 load_dotenv()
 
 # === Konfigurasi Database === #
-def get_connection():
-    # server = 'localhost:5432' # localhost
-    host = os.getenv("DB_HOST", "localhost")
-    port = os.getenv("DB_PORT", "5432")
-    dbname = os.getenv("DB_NAME")
-    username = os.getenv("DB_USER")
-    password = os.getenv("DB_PASS")
+host = os.getenv("DB_HOST", "localhost")
+port = os.getenv("DB_PORT", "5432")
+dbname = os.getenv("DB_NAME")
+username = os.getenv("DB_USER")
+password = os.getenv("DB_PASS")
 
-    # return create_engine(f'postgresql+psycopg2://{username}:{password}@{host}:{port}/{dbname}')
-    # Tambah parameter pool_size, max_overflow, pool_timeout, pool_recycle
-    engine = create_engine(
-        f'postgresql+psycopg2://{username}:{password}@{host}:{port}/{dbname}',
-        pool_size=10,          # jumlah koneksi tetap dalam pool
-        max_overflow=5,        # jumlah koneksi tambahan saat pool penuh
-        pool_timeout=30,       # waktu tunggu saat pool penuh (detik)
-        pool_recycle=1800      # recycle koneksi setiap 30 menit agar tidak timeout
-    )
-    return engine
+DATABASE_URL = f'postgresql+psycopg2://{username}:{password}@{host}:{port}/{dbname}'
+
+# ⛽️ Engine dibuat sekali dan dipakai ulang (pool aman)
+engine = create_engine(
+    DATABASE_URL,
+    pool_size=10,
+    max_overflow=5,
+    pool_timeout=30,
+    pool_recycle=1800,
+    pool_pre_ping=True  # opsional tapi direkomendasikan
+)
+
+def get_connection():
+    return engine  # engine ini global, tidak dibuat ulang
 
 # === Mencari Timestamp WITA === #
 def get_wita():

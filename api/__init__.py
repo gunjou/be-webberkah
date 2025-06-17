@@ -14,6 +14,7 @@ from .tipe_pegawai import tipe_pegawai_ns
 from .absensi import absensi_ns
 from .rekapan import rekapan_ns
 from .perhitungan_gaji import perhitungan_ns
+from .izin_sakit import izin_ns
 # from .testdb import testdb_ns
 
 from .utils.blacklist_store import is_blacklisted
@@ -78,4 +79,5 @@ restx_api.add_namespace(tipe_pegawai_ns, path="/tipe-pegawai")
 restx_api.add_namespace(absensi_ns, path="/absensi")
 restx_api.add_namespace(rekapan_ns, path="/rekapan")
 restx_api.add_namespace(perhitungan_ns, path="/perhitungan-gaji")
+restx_api.add_namespace(izin_ns, path="/perizinan")
 # restx_api.add_namespace(testdb_ns, path="/test-db")

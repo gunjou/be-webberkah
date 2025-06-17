@@ -3,8 +3,6 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from ..utils.config import get_connection
 
-connection = get_connection().connect()
-
 
 def process_rekap_absensi(data):
     for row in data:
@@ -79,59 +77,63 @@ def process_rekap_absensi_by_id(data):
 
 
 def get_rekap_absensi(start_date, end_date):
+    engine = get_connection()
     try:
-        query = text("""
-            SELECT 
-                k.id_karyawan,
-                k.nama_lengkap,
-                k.gaji_pokok,
-                k.tipe,
-                COUNT(CASE WHEN a.status = 'hadir' THEN 1 END) AS jumlah_hadir,
-                COUNT(CASE WHEN a.status = 'izin' THEN 1 END) AS jumlah_izin,
-                COUNT(CASE WHEN a.status = 'sakit' THEN 1 END) AS jumlah_sakit,
-                COUNT(CASE WHEN a.status = 'dinas_luar' THEN 1 END) AS dinas_luar,
-                SUM(a.keterlambatan) AS total_jam_terlambat,
-                SUM(a.kurang_jam) AS total_jam_kurang
-            FROM absensi a
-            JOIN karyawan k ON a.id_karyawan = k.id_karyawan
-            WHERE a.tanggal BETWEEN :start_date AND :end_date
-            GROUP BY k.id_karyawan, k.nama_lengkap, k.gaji_pokok, k.tipe
-        """)
-        result = connection.execute(query, {'start_date': start_date, 'end_date': end_date})
-        data = [dict(row) for row in result.mappings()]
-        return process_rekap_absensi(data)
+        with engine.connect() as connection:
+            query = text("""
+                SELECT 
+                    k.id_karyawan,
+                    k.nama_lengkap,
+                    k.gaji_pokok,
+                    k.tipe,
+                    COUNT(CASE WHEN a.status = 'hadir' THEN 1 END) AS jumlah_hadir,
+                    COUNT(CASE WHEN a.status = 'izin' THEN 1 END) AS jumlah_izin,
+                    COUNT(CASE WHEN a.status = 'sakit' THEN 1 END) AS jumlah_sakit,
+                    COUNT(CASE WHEN a.status = 'dinas_luar' THEN 1 END) AS dinas_luar,
+                    SUM(a.keterlambatan) AS total_jam_terlambat,
+                    SUM(a.kurang_jam) AS total_jam_kurang
+                FROM absensi a
+                JOIN karyawan k ON a.id_karyawan = k.id_karyawan
+                WHERE a.tanggal BETWEEN :start_date AND :end_date
+                GROUP BY k.id_karyawan, k.nama_lengkap, k.gaji_pokok, k.tipe
+            """)
+            result = connection.execute(query, {'start_date': start_date, 'end_date': end_date})
+            data = [dict(row) for row in result.mappings()]
+            return process_rekap_absensi(data)
     except SQLAlchemyError as e:
         print(f"Error occurred: {str(e)}")
         return []
 
 
 def get_rekap_absensi_by_id(start_date, end_date, id_karyawan):
+    engine = get_connection()
     try:
-        query = text("""
-            SELECT 
-                k.id_karyawan,
-                k.nama_lengkap,
-                k.gaji_pokok,
-                k.tipe,
-                COUNT(CASE WHEN a.status = 'hadir' THEN 1 END) AS jumlah_hadir,
-                COUNT(CASE WHEN a.status = 'izin' THEN 1 END) AS jumlah_izin,
-                COUNT(CASE WHEN a.status = 'sakit' THEN 1 END) AS jumlah_sakit,
-                COUNT(CASE WHEN a.status = 'dinas_luar' THEN 1 END) AS dinas_luar,
-                SUM(a.keterlambatan) AS total_jam_terlambat,
-                SUM(a.kurang_jam) AS total_jam_kurang
-            FROM absensi a
-            JOIN karyawan k ON a.id_karyawan = k.id_karyawan
-            WHERE a.tanggal BETWEEN :start_date AND :end_date
-              AND a.id_karyawan = :id_karyawan
-            GROUP BY k.id_karyawan, k.nama_lengkap, k.gaji_pokok, k.tipe
-        """)
-        result = connection.execute(query, {
-            'start_date': start_date,
-            'end_date': end_date,
-            'id_karyawan': id_karyawan
-        })
-        row = result.mappings().fetchone()
-        return process_rekap_absensi_by_id(dict(row)) if row else None
+        with engine.connect() as connection:
+            query = text("""
+                SELECT 
+                    k.id_karyawan,
+                    k.nama_lengkap,
+                    k.gaji_pokok,
+                    k.tipe,
+                    COUNT(CASE WHEN a.status = 'hadir' THEN 1 END) AS jumlah_hadir,
+                    COUNT(CASE WHEN a.status = 'izin' THEN 1 END) AS jumlah_izin,
+                    COUNT(CASE WHEN a.status = 'sakit' THEN 1 END) AS jumlah_sakit,
+                    COUNT(CASE WHEN a.status = 'dinas_luar' THEN 1 END) AS dinas_luar,
+                    SUM(a.keterlambatan) AS total_jam_terlambat,
+                    SUM(a.kurang_jam) AS total_jam_kurang
+                FROM absensi a
+                JOIN karyawan k ON a.id_karyawan = k.id_karyawan
+                WHERE a.tanggal BETWEEN :start_date AND :end_date
+                AND a.id_karyawan = :id_karyawan
+                GROUP BY k.id_karyawan, k.nama_lengkap, k.gaji_pokok, k.tipe
+            """)
+            result = connection.execute(query, {
+                'start_date': start_date,
+                'end_date': end_date,
+                'id_karyawan': id_karyawan
+            })
+            row = result.mappings().fetchone()
+            return process_rekap_absensi_by_id(dict(row)) if row else None
     except SQLAlchemyError as e:
         print(f"Error occurred: {str(e)}")
         return []
