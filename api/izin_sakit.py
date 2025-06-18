@@ -2,6 +2,7 @@ import os
 from flask import current_app, request
 from flask_restx import Namespace, Resource, fields # type: ignore
 from werkzeug.utils import secure_filename
+from flask_jwt_extended import get_jwt_identity
 
 from .utils.decorator import role_required
 from .query.q_izin_sakit import *
@@ -9,7 +10,6 @@ from .query.q_izin_sakit import *
 izin_ns = Namespace('perizinan', description='Manajemen Pengajuan Izin/Sakit')
 
 izin_model = izin_ns.model('PengajuanIzin', {
-    'id_karyawan': fields.Integer(required=True),
     'id_jenis': fields.Integer(required=True, description='3 = Izin, 4 = Sakit'),
     'keterangan': fields.String(required=True),
     'tgl_mulai': fields.String(required=True, description='Format: YYYY-MM-DD'),
@@ -18,12 +18,11 @@ izin_model = izin_ns.model('PengajuanIzin', {
 })
 
 izin_parser = izin_ns.parser()
-izin_parser.add_argument('id_karyawan', type=int, required=True, location='form')
-izin_parser.add_argument('id_jenis', type=int, required=True, location='form')
-izin_parser.add_argument('keterangan', type=str, required=False, location='form')
-izin_parser.add_argument('tgl_mulai', type=str, required=True, location='form')
-izin_parser.add_argument('tgl_selesai', type=str, required=True, location='form')
-izin_parser.add_argument('file', type='FileStorage', location='files', required=False)
+izin_parser.add_argument('id_jenis', type=int, required=True, location='form', help='3 = Izin, 4 = Sakit')
+izin_parser.add_argument('keterangan', type=str, required=False, location='form', help='Masukkan keterangan')
+izin_parser.add_argument('tgl_mulai', type=str, required=True, location='form', help='Format: DD-MM-YYYY')
+izin_parser.add_argument('tgl_selesai', type=str, required=True, location='form', help='Format: DD-MM-YYYY')
+izin_parser.add_argument('file', type='FileStorage', location='files', required=False, help='Path file jika ada')
 
 # Parser untuk menerima file
 upload_parser = izin_ns.parser()
@@ -65,11 +64,11 @@ class PengajuanIzinResource(Resource):
 
         # Susun data yang dikirim ke fungsi query
         data = {
-            'id_karyawan': args['id_karyawan'],
+            'id_karyawan': get_jwt_identity(),
             'id_jenis': args['id_jenis'],
             'keterangan': args['keterangan'],
-            'tgl_mulai': args['tgl_mulai'],
-            'tgl_selesai': args['tgl_selesai'],
+            'tgl_mulai': datetime.strptime(args['tgl_mulai'], "%d-%m-%Y").date(),
+            'tgl_selesai': datetime.strptime(args['tgl_selesai'], "%d-%m-%Y").date(),
             'path_lampiran': path_lampiran
         }
 

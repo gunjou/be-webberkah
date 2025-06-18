@@ -310,6 +310,26 @@ class AbsensiTidakHadir(Resource):
         return {'absensi': data}, 200
 
 
+@absensi_ns.route('/izin-sakit')
+class AbsensiIzinSakit(Resource):
+    @role_required('admin')
+    @absensi_ns.doc(params={'tanggal': 'Format tanggal DD-MM-YYYY'})
+    def get(self):
+        """Akses: (admin), Check karyawan dengan status izin/sakit berdasarkan tanggal"""
+        tanggal_param = request.args.get('tanggal')
+
+        try:
+            if tanggal_param:
+                tanggal_filter = datetime.strptime(tanggal_param, "%d-%m-%Y").date()
+            else:
+                tanggal_filter, _ = get_timezone()
+        except ValueError:
+            return {'status': 'Format tanggal tidak valid. Gunakan DD-MM-YYYY'}, 400
+
+        data = query_absensi_izin_sakit(tanggal_filter)
+        return {'absensi': data}, 200
+
+
 @absensi_ns.route('/edit/<int:id_absensi>')
 class EditAbsensi(Resource):
     @absensi_ns.expect(edit_absensi_model)

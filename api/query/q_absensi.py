@@ -257,7 +257,7 @@ def query_absensi_harian_admin(tanggal):
                     INNER JOIN Karyawan k ON k.id_karyawan = a.id_karyawan 
                     INNER JOIN Jeniskaryawan j ON k.id_jenis = j.id_jenis 
                     INNER JOIN StatusPresensi s ON a.id_status = s.id_status 
-                    WHERE a.status = 1 AND a.tanggal = :tanggal;
+                    WHERE a.status = 1 AND a.id_status = 1 AND a.tanggal = :tanggal;
                 """),
                 {"tanggal": tanggal}
             )
@@ -314,6 +314,39 @@ def query_absensi_tidak_hadir(tanggal):
                 "jenis": row["jenis"],
                 "tanggal": row["tanggal"].strftime("%d-%m-%Y"),
                 "status_absen": "Tanpa Keterangan"
+            } for index, row in enumerate(absensi_list)]
+
+    except SQLAlchemyError as e:
+        print(f"Error occurred: {str(e)}")
+        return []
+    
+def query_absensi_izin_sakit(tanggal):
+    engine = get_connection()
+    try:
+        with engine.connect() as connection:
+            result = connection.execute(
+                text("""
+                    SELECT k.id_karyawan, k.nama, k.id_jenis, j.jenis, a.id_status, sp.nama_status, :tanggal AS tanggal
+                    FROM absensi a
+                    INNER JOIN statuspresensi sp ON a.id_status = sp.id_status
+                    LEFT JOIN karyawan k ON a.id_karyawan = k.id_karyawan AND a.tanggal = :tanggal
+                    INNER JOIN JenisKaryawan j ON k.id_jenis = j.id_jenis
+                    WHERE k.status = 1 AND a.id_status = 3
+                """),
+                {"tanggal": tanggal}
+            )
+
+            absensi_list = [dict(row) for row in result.mappings()]
+
+            return [{
+                "id": index + 1,
+                "id_karyawan": row["id_karyawan"],
+                "nama": row["nama"],
+                "id_status": row["id_status"],
+                "status_absen": row["nama_status"],
+                "id_jenis": row["id_jenis"],
+                "jenis": row["jenis"],
+                "tanggal": row["tanggal"].strftime("%d-%m-%Y"),
             } for index, row in enumerate(absensi_list)]
 
     except SQLAlchemyError as e:
