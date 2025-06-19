@@ -320,22 +320,26 @@ def query_absensi_tidak_hadir(tanggal):
         print(f"Error occurred: {str(e)}")
         return []
     
-def query_absensi_izin_sakit(tanggal):
+def query_absensi_izin_sakit(tanggal, id_karyawan=None):
     engine = get_connection()
     try:
         with engine.connect() as connection:
-            result = connection.execute(
-                text("""
-                    SELECT k.id_karyawan, k.nama, k.id_jenis, j.jenis, a.id_status, sp.nama_status, :tanggal AS tanggal
-                    FROM absensi a
-                    INNER JOIN statuspresensi sp ON a.id_status = sp.id_status
-                    LEFT JOIN karyawan k ON a.id_karyawan = k.id_karyawan AND a.tanggal = :tanggal
-                    INNER JOIN JenisKaryawan j ON k.id_jenis = j.id_jenis
-                    WHERE k.status = 1 AND a.id_status = 3
-                """),
-                {"tanggal": tanggal}
-            )
+            query = """
+                SELECT k.id_karyawan, k.nama, k.id_jenis, j.jenis, a.id_status, sp.nama_status, :tanggal AS tanggal
+                FROM absensi a
+                INNER JOIN statuspresensi sp ON a.id_status = sp.id_status
+                LEFT JOIN karyawan k ON a.id_karyawan = k.id_karyawan AND a.tanggal = :tanggal
+                INNER JOIN JenisKaryawan j ON k.id_jenis = j.id_jenis
+                WHERE k.status = 1 AND a.id_status IN (3, 4)
+            """
 
+            params = {"tanggal": tanggal}
+
+            if id_karyawan:
+                query += " AND k.id_karyawan = :id_karyawan"
+                params["id_karyawan"] = id_karyawan
+
+            result = connection.execute(text(query), params)
             absensi_list = [dict(row) for row in result.mappings()]
 
             return [{

@@ -2,6 +2,7 @@ from datetime import datetime
 import re
 import logging
 from flask import request
+from flask_jwt_extended import jwt_required
 from flask_restx import Namespace, Resource, fields
 from werkzeug.datastructures import FileStorage
 from sqlalchemy.exc import SQLAlchemyError
@@ -312,11 +313,15 @@ class AbsensiTidakHadir(Resource):
 
 @absensi_ns.route('/izin-sakit')
 class AbsensiIzinSakit(Resource):
-    @role_required('admin')
-    @absensi_ns.doc(params={'tanggal': 'Format tanggal DD-MM-YYYY'})
+    @jwt_required()
+    @absensi_ns.doc(params={
+        'tanggal': 'Format tanggal DD-MM-YYYY (opsional)',
+        'id_karyawan': 'Filter berdasarkan ID karyawan (opsional)'
+    })
     def get(self):
-        """Akses: (admin), Check karyawan dengan status izin/sakit berdasarkan tanggal"""
+        """Akses: (admin, karyawan), Cek absensi dengan status izin/sakit berdasarkan tanggal dan opsional id_karyawan"""
         tanggal_param = request.args.get('tanggal')
+        id_karyawan = request.args.get('id_karyawan')
 
         try:
             if tanggal_param:
@@ -326,7 +331,7 @@ class AbsensiIzinSakit(Resource):
         except ValueError:
             return {'status': 'Format tanggal tidak valid. Gunakan DD-MM-YYYY'}, 400
 
-        data = query_absensi_izin_sakit(tanggal_filter)
+        data = query_absensi_izin_sakit(tanggal_filter, id_karyawan)
         return {'absensi': data}, 200
 
 
