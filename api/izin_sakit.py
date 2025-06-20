@@ -161,12 +161,12 @@ class UploadLampiran(Resource):
         }, 200
     
 
-@izin_ns.route('/<int:id>/setujui')
+@izin_ns.route('/<int:id_izin>/setujui')
 class SetujuiIzinResource(Resource):
     @role_required('admin')
-    def put(self, id):
+    def put(self, id_izin):
         """Akses: (admin), Menyetujui izin dan memasukkan ke absensi"""
-        success = setujui_izin_dan_insert_absensi(id)
+        success = setujui_izin_dan_insert_absensi(id_izin)
         if success is None:
             return {'status': 'Gagal menyetujui izin'}, 500
         if success == 0:
@@ -175,13 +175,13 @@ class SetujuiIzinResource(Resource):
         return {'status': 'Izin berhasil disetujui dan dicatat ke absensi'}, 200
 
 
-@izin_ns.route('/<int:id>/tolak')
+@izin_ns.route('/<int:id_izin>/tolak')
 class TolakIzinResource(Resource):
     @role_required('admin')
     @izin_ns.expect(izin_ns.model('AlasanTolakModel', {
         'alasan': fields.String(required=True, description='Alasan penolakan')
     }))
-    def put(self, id):
+    def put(self, id_izin):
         """Akses: (admin), Menolak izin dan mencatat alasan"""
         data = request.json
         alasan = data.get("alasan")
@@ -189,7 +189,7 @@ class TolakIzinResource(Resource):
         if not alasan:
             return {"status": "Alasan penolakan wajib diisi"}, 400
 
-        result = tolak_izin(id, alasan)
+        result = tolak_izin(id_izin, alasan)
         if result is None:
             return {"status": "Gagal menolak izin"}, 500
         if result == 0:
