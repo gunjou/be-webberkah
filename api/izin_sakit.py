@@ -2,7 +2,7 @@ import os
 from flask import current_app, request
 from flask_restx import Namespace, Resource, fields # type: ignore
 from werkzeug.utils import secure_filename
-from flask_jwt_extended import get_jwt_identity
+from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from .utils.decorator import role_required
 from .query.q_izin_sakit import *
@@ -24,6 +24,12 @@ izin_parser.add_argument('tgl_mulai', type=str, required=True, location='form', 
 izin_parser.add_argument('tgl_selesai', type=str, required=True, location='form', help='Format: DD-MM-YYYY')
 izin_parser.add_argument('file', type='FileStorage', location='files', required=False, help='Path file jika ada')
 
+setengah_hari_parser = izin_ns.parser()
+setengah_hari_parser.add_argument('keterangan', type=str, required=True, location='form', help='Masukkan keterangan')
+setengah_hari_parser.add_argument('jam_mulai', type=str, required=True, location='form', help='Format: HH:MM')
+setengah_hari_parser.add_argument('jam_selesai', type=str, required=True, location='form', help='Format: HH:MM')
+setengah_hari_parser.add_argument('file', type='FileStorage', location='files', required=False, help='Path file jika ada')
+
 # Parser untuk menerima file
 upload_parser = izin_ns.parser()
 upload_parser.add_argument('file', location='files', type='file', required=True)
@@ -37,6 +43,23 @@ def allowed_file(filename):
 
 @izin_ns.route('/')
 class PengajuanIzinResource(Resource):
+    @role_required('admin')
+    @izin_ns.doc(params={
+        'status_izin': 'Filter berdasarkan status izin (pending, approved, rejected)',
+        'id_karyawan': 'Filter berdasarkan ID karyawan'
+    })
+    def get(self):
+        """Akses: (admin), Menampilkan semua data izin, bisa difilter per status atau per karyawan"""
+        status_izin = request.args.get('status_izin')
+        id_karyawan = request.args.get('id_karyawan')
+
+        hasil = get_daftar_izin(status_izin, id_karyawan)
+
+        if hasil is None:
+            return {'status': 'Gagal mengambil data izin'}, 500
+
+        return {'data': hasil}, 200
+    
     @izin_ns.expect(izin_parser)
     @role_required('karyawan')
     def post(self):
@@ -79,24 +102,33 @@ class PengajuanIzinResource(Resource):
         return {'status': 'Pengajuan izin berhasil direkam'}, 201
     
 
-    @role_required('admin')
+@izin_ns.route('/by-karyawan')
+class IzinByKaryawan(Resource):
+    @role_required('karyawan')
     @izin_ns.doc(params={
-        'status_izin': 'Filter berdasarkan status izin (pending, approved, rejected)',
-        'id_karyawan': 'Filter berdasarkan ID karyawan'
+        'tanggal': 'Filter izin berdasarkan tanggal tertentu (format: DD-MM-YYYY), default: hari ini'
     })
     def get(self):
-        """Akses: (admin), Menampilkan semua data izin, bisa difilter per status atau per karyawan"""
-        status_izin = request.args.get('status_izin')
-        id_karyawan = request.args.get('id_karyawan')
+        """Akses: (karyawan), Menampilkan izin berdasarkan tanggal (default: hari ini) untuk user login"""
+        try:
+            tanggal_str = request.args.get('tanggal')
+            if tanggal_str:
+                tanggal = datetime.strptime(tanggal_str, "%d-%m-%Y").date()
+            else:
+                tanggal = date.today()
 
-        hasil = get_daftar_izin(status_izin, id_karyawan)
+            id_karyawan = get_jwt_identity()
 
-        if hasil is None:
-            return {'status': 'Gagal mengambil data izin'}, 500
+            hasil = get_daftar_izin_oleh_karyawan(id_karyawan, tanggal)
 
-        return {'data': hasil}, 200
-    
+            if hasil is None:
+                return {'status': 'Gagal mengambil data izin'}, 500
 
+            return {'data': hasil}, 200
+        except Exception as e:
+            return {'status': 'Error', 'message': str(e)}, 400
+        
+        
 @izin_ns.route('/upload')
 class UploadLampiran(Resource):
     @role_required('karyawan')  # hanya karyawan yang boleh upload

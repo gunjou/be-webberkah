@@ -53,6 +53,49 @@ def get_daftar_izin(status_izin=None, id_karyawan=None):
         print(f"DB Error: {str(e)}")
         return None
 
+def get_daftar_izin_oleh_karyawan(id_karyawan, tanggal=None):
+    if tanggal is None:
+        tanggal = date.today()
+
+    engine = get_connection()
+    try:
+        with engine.connect() as connection:
+            query = """
+                SELECT i.id_izin, i.id_karyawan, k.nama AS nama_karyawan, j.nama_status, 
+                    i.keterangan, i.tgl_mulai, i.tgl_selesai, 
+                    i.path_lampiran, i.status_izin, i.alasan_penolakan,
+                    i.created_at, i.updated_at
+                FROM izin i
+                JOIN karyawan k ON i.id_karyawan = k.id_karyawan
+                JOIN statuspresensi j ON i.id_jenis = j.id_status
+                WHERE i.status = 1
+                  AND i.id_karyawan = :id_karyawan
+                  AND :tanggal BETWEEN i.tgl_mulai AND i.tgl_selesai
+                ORDER BY i.created_at DESC
+            """
+            params = {
+                'id_karyawan': id_karyawan,
+                'tanggal': tanggal
+            }
+
+            result = connection.execute(text(query), params).mappings().fetchall()
+
+            data = []
+            for row in result:
+                row_dict = {}
+                for key, value in row.items():
+                    if isinstance(value, (date, datetime)):
+                        row_dict[key] = value.isoformat()
+                    else:
+                        row_dict[key] = value
+                data.append(row_dict)
+
+            return data
+
+    except SQLAlchemyError as e:
+        print(f"DB Error: {str(e)}")
+        return None
+    
 def insert_pengajuan_izin(data):
     engine = get_connection()
     try:
