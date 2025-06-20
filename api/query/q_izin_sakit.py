@@ -200,3 +200,23 @@ def tolak_izin(id_izin, alasan_penolakan):
     except SQLAlchemyError as e:
         print(f"DB Error: {str(e)}")
         return None
+
+def hapus_izin(id_izin):
+    engine = get_connection()
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text("""
+                    UPDATE izin
+                    SET status = 0, updated_at = :updated_at
+                    WHERE id_izin = :id_izin
+                """),
+                {
+                    "id_izin": id_izin,
+                    "updated_at": get_wita()
+                }
+            )
+            return True
+    except SQLAlchemyError as e:
+        print(f"DB Error (hapus_izin): {str(e)}")
+        return False

@@ -196,3 +196,14 @@ class TolakIzinResource(Resource):
             return {"status": "ID izin tidak ditemukan"}, 404
 
         return {"status": "Izin berhasil ditolak"}, 200
+
+
+@izin_ns.route('/<int:id_izin>')
+class HapusIzin(Resource):
+    @jwt_required()
+    def delete(self, id_izin):
+        """Akses: (admin, karyawan), Hapus (soft-delete)"""
+        success = hapus_izin(id_izin)
+        if success:
+            return {"status": "Berhasil menghapus izin"}, 200
+        return {"status": "Gagal menghapus izin"}, 500
