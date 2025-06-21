@@ -1,7 +1,8 @@
 import os
-from flask import current_app, request
+from flask import current_app, request, send_from_directory, abort
 from flask_restx import Namespace, Resource, fields # type: ignore
 from werkzeug.utils import secure_filename
+from werkzeug.datastructures import FileStorage
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from .utils.decorator import role_required
@@ -22,7 +23,7 @@ izin_parser.add_argument('id_jenis', type=int, required=True, location='form', h
 izin_parser.add_argument('keterangan', type=str, required=False, location='form', help='Masukkan keterangan')
 izin_parser.add_argument('tgl_mulai', type=str, required=True, location='form', help='Format: DD-MM-YYYY')
 izin_parser.add_argument('tgl_selesai', type=str, required=True, location='form', help='Format: DD-MM-YYYY')
-izin_parser.add_argument('file', type='FileStorage', location='files', required=False, help='Path file jika ada')
+izin_parser.add_argument('file', type=FileStorage, location='files', required=False, help='Path file jika ada')
 
 setengah_hari_parser = izin_ns.parser()
 setengah_hari_parser.add_argument('keterangan', type=str, required=True, location='form', help='Masukkan keterangan')
@@ -65,7 +66,7 @@ class PengajuanIzinResource(Resource):
     def post(self):
         """Akses: (karyawan), Ajukan izin atau sakit (lampiran wajib untuk sakit)"""
         args = izin_parser.parse_args()
-        file = args.get('file')
+        file = args['file']
 
         # Validasi lampiran jika jenis = 4 (sakit)
         if args['id_jenis'] == 4 and file is None:
@@ -159,6 +160,28 @@ class UploadLampiran(Resource):
             'status': 'Upload berhasil',
             'path_lampiran': relative_path
         }, 200
+    
+
+@izin_ns.route('/preview/<path:relative_path>')
+class PreviewLampiran(Resource):
+    @jwt_required()
+    @izin_ns.doc(security='Bearer Auth', description='Preview lampiran izin (PDF/JPG/PNG)')
+    def get(self, relative_path):
+        """
+        Akses: (admin/karyawan) Preview file izin berdasarkan path (izin/2025-06/nama_file.pdf)
+        """
+        # Cegah traversal attack
+        if '..' in relative_path or relative_path.startswith('/'):
+            abort(400, description='Path tidak valid')
+
+        # Pisahkan folder dan filename
+        full_path = os.path.join(current_app.root_path, '..', relative_path)
+        folder, filename = os.path.split(full_path)
+
+        if not os.path.exists(full_path):
+            abort(404, description='File tidak ditemukan')
+
+        return send_from_directory(folder, filename)
     
 
 @izin_ns.route('/<int:id_izin>/setujui')
