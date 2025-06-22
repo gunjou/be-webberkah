@@ -11,10 +11,13 @@ def hitung_waktu_kerja(jam_masuk, jam_keluar):
 def hitung_keterlambatan(jam_masuk):
     wita = pytz.timezone("Asia/Makassar")
     if jam_masuk.tzinfo is not None:
-        jam_masuk = jam_masuk.astimezone(wita).time()
+        jam_masuk = jam_masuk.astimezone(wita)
+    # Buang detik dan mikrodetik
+    jam_masuk = jam_masuk.replace(second=0, microsecond=0).time()
     jam_masuk_batas = time(8, 0)
     if jam_masuk <= jam_masuk_batas:
-        return None
+        return None  # Tidak terlambat
+    # Hitung keterlambatan dalam menit
     return (jam_masuk.hour * 60 + jam_masuk.minute) - (jam_masuk_batas.hour * 60 + jam_masuk_batas.minute)
 
 def hitung_jam_kurang(jam_keluar):
@@ -25,7 +28,8 @@ def hitung_jam_kurang(jam_keluar):
         except ValueError:
             return None
     elif isinstance(jam_keluar, time):
-        jam_keluar_obj = jam_keluar
+        # Buang detik dan mikrodetik jika bertipe time
+        jam_keluar_obj = jam_keluar.replace(second=0, microsecond=0)
     else:
         return None
 

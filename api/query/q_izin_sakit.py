@@ -220,3 +220,53 @@ def hapus_izin(id_izin):
     except SQLAlchemyError as e:
         print(f"DB Error (hapus_izin): {str(e)}")
         return False
+
+#=== Izin setengah hari ===#
+def get_absensi_by_date(id_karyawan, tanggal):
+    engine = get_connection()
+    try:
+        with engine.connect() as connection:
+            result = connection.execute(text("""
+                SELECT * FROM absensi
+                WHERE id_karyawan = :id_karyawan
+                  AND tanggal = :tanggal
+                  AND status = 1
+                LIMIT 1
+            """), {
+                "id_karyawan": id_karyawan,
+                "tanggal": tanggal
+            }).mappings().fetchone()
+            return result
+    except SQLAlchemyError as e:
+        print(f"DB Error: {str(e)}")
+        return None
+
+def update_absensi_izin_setengah_hari(id_karyawan, tanggal, jam_keluar, lokasi_keluar, total_jam_kerja, jam_kurang):
+    engine = get_connection()
+    try:
+        with engine.begin() as connection:
+            query = text("""
+                UPDATE absensi
+                SET jam_keluar = :jam_keluar,
+                    lokasi_keluar = :lokasi_keluar,
+                    total_jam_kerja = :total_jam_kerja,
+                    jam_kurang = :jam_kurang,
+                    updated_at = :updated_at
+                WHERE id_karyawan = :id_karyawan
+                  AND tanggal = :tanggal
+                  AND status = 1
+            """)
+            connection.execute(query, {
+                "jam_keluar": jam_keluar,
+                "lokasi_keluar": lokasi_keluar,
+                "total_jam_kerja": total_jam_kerja,
+                "jam_kurang": jam_kurang,
+                "updated_at": get_wita(),
+                "id_karyawan": id_karyawan,
+                "tanggal": tanggal
+            })
+            return 1
+    except SQLAlchemyError as e:
+        print(f"DB Error: {str(e)}")
+        return None
+

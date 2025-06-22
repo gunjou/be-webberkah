@@ -1,10 +1,12 @@
+from datetime import time
 import os
 from flask import current_app, request, send_from_directory, abort
-from flask_restx import Namespace, Resource, fields # type: ignore
+from flask_restx import Namespace, Resource, fields, reqparse
 from werkzeug.utils import secure_filename
 from werkzeug.datastructures import FileStorage
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
+from .utils.helpers import hitung_jam_kurang, hitung_keterlambatan, hitung_waktu_kerja
 from .utils.decorator import role_required
 from .query.q_izin_sakit import *
 
@@ -25,11 +27,8 @@ izin_parser.add_argument('tgl_mulai', type=str, required=True, location='form', 
 izin_parser.add_argument('tgl_selesai', type=str, required=True, location='form', help='Format: DD-MM-YYYY')
 izin_parser.add_argument('file', type=FileStorage, location='files', required=False, help='Path file jika ada')
 
-setengah_hari_parser = izin_ns.parser()
-setengah_hari_parser.add_argument('keterangan', type=str, required=True, location='form', help='Masukkan keterangan')
-setengah_hari_parser.add_argument('jam_mulai', type=str, required=True, location='form', help='Format: HH:MM')
-setengah_hari_parser.add_argument('jam_selesai', type=str, required=True, location='form', help='Format: HH:MM')
-setengah_hari_parser.add_argument('file', type='FileStorage', location='files', required=False, help='Path file jika ada')
+setengah_hari_parser = reqparse.RequestParser()
+setengah_hari_parser.add_argument('jam_selesai', type=str, required=True, help='Format jam selesai: HH:MM')
 
 # Parser untuk menerima file
 upload_parser = izin_ns.parser()
@@ -183,6 +182,42 @@ class PreviewLampiran(Resource):
 
         return send_from_directory(folder, filename)
     
+
+@izin_ns.route('/setengah-hari')
+class PengajuanIzinSetengahHariResource(Resource):
+    @izin_ns.expect(setengah_hari_parser)
+    @role_required('karyawan')
+    def post(self):
+        args = setengah_hari_parser.parse_args()
+
+        id_karyawan = get_jwt_identity()
+        jam_selesai = datetime.strptime(args['jam_selesai'], "%H:%M").time()
+        lokasi_keluar = "Setengah hari"
+        today = datetime.now().date()
+
+        # Ambil absensi hari ini
+        absensi = get_absensi_by_date(id_karyawan, today)
+        if not absensi or not absensi['jam_masuk']:
+            return {'message': 'Anda belum melakukan absensi masuk hari ini'}, 400
+
+        jam_masuk = absensi['jam_masuk']
+
+        # Hitung waktu kerja, keterlambatan, dan jam kurang
+        total_jam_kerja = hitung_waktu_kerja(jam_masuk, jam_selesai)
+        jam_kurang = hitung_jam_kurang(jam_selesai)
+
+        # Update absensi
+        update_absensi_izin_setengah_hari(
+            id_karyawan=id_karyawan,
+            tanggal=today,
+            jam_keluar=jam_selesai,
+            lokasi_keluar=lokasi_keluar,
+            total_jam_kerja=total_jam_kerja,
+            jam_kurang=jam_kurang
+        )
+
+        return {'status': 'Izin setengah hari (pulang awal) berhasil dicatat'}, 201
+
 
 @izin_ns.route('/<int:id_izin>/setujui')
 class SetujuiIzinResource(Resource):
