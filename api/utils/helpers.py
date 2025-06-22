@@ -13,7 +13,7 @@ def hitung_keterlambatan(jam_masuk):
     if jam_masuk.tzinfo is not None:
         jam_masuk = jam_masuk.astimezone(wita)
     # Buang detik dan mikrodetik
-    jam_masuk = jam_masuk.replace(second=0, microsecond=0).time()
+    jam_masuk = jam_masuk.replace(second=0, microsecond=0)
     jam_masuk_batas = time(8, 0)
     if jam_masuk <= jam_masuk_batas:
         return None  # Tidak terlambat
