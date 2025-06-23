@@ -1,4 +1,5 @@
 from datetime import datetime, time, date
+from decimal import Decimal
 import pytz
 
 def hitung_waktu_kerja(jam_masuk, jam_keluar):
@@ -53,3 +54,17 @@ def hitung_jam_kurang(jam_keluar):
         delta = datetime.combine(date.today(), waktu_ideal) - datetime.combine(date.today(), jam_keluar_obj)
         return int(delta.total_seconds() // 60)
     return None
+
+def decimal_to_float(row):
+    return {
+        key: float(value) if isinstance(value, Decimal) else value
+        for key, value in row.items()
+    }
+
+def serialize_time(obj):
+    """Mengubah objek time ke string, dan juga mengubah float Decimal."""
+    if isinstance(obj, time):
+        return obj.strftime("%H:%M:%S")
+    elif isinstance(obj, Decimal):
+        return float(obj)
+    return obj

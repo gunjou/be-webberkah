@@ -5,38 +5,27 @@ from sqlalchemy.exc import SQLAlchemyError
 from calendar import monthrange
 
 from ..utils.config import get_connection
+from ..utils.helpers import decimal_to_float, serialize_time
 
-def decimal_to_float(row):
-    return {
-        key: float(value) if isinstance(value, Decimal) else value
-        for key, value in row.items()
-    }
 
 def get_leaderboard_kerajinan(start_date=None, end_date=None):
     engine = get_connection()
     today = datetime.today().date()
 
-    # Konversi dari string ke date (jika perlu)
+    # Fallback dan konversi tanggal
     if isinstance(start_date, str):
         start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
     if isinstance(end_date, str):
         end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
 
-    # Logika fallback tanggal
     if start_date is None and end_date is None:
-        # Kasus 1: Default ke tanggal 1 bulan ini s.d hari ini
         start_date = today.replace(day=1)
         end_date = today
     elif start_date is not None and end_date is None:
-        # Kasus 2: start_date diberikan, end_date = hari ini
         end_date = today
     elif end_date is not None and start_date is None:
-        # Kasus 3: end_date diberikan, start_date = tanggal 1 di bulan end_date
         start_date = end_date.replace(day=1)
-    # Kasus 4: keduanya sudah diisi → tidak perlu diubah
 
-    print('start_date: ', start_date)
-    print('end_date: ', end_date)
     try:
         with engine.connect() as connection:
             query = text("""
@@ -88,9 +77,7 @@ def get_leaderboard_kerajinan(start_date=None, end_date=None):
                     COUNT(*) FILTER (WHERE id_status = 1) AS jumlah_hadir,
                     COUNT(*) FILTER (WHERE id_status = 3) AS jumlah_izin,
                     COUNT(*) FILTER (WHERE id_status = 4) AS jumlah_sakit,
-                    COUNT(*) FILTER (
-                        WHERE id_status = 0
-                    ) AS jumlah_alpha,
+                    COUNT(*) FILTER (WHERE id_status = 0) AS jumlah_alpha,
                     208 AS jam_kerja_normal,
                     SUM(total_jam_kerja/60) AS total_jam_kerja,
                     SUM(jam_terlambat) AS jam_terlambat,
@@ -99,10 +86,21 @@ def get_leaderboard_kerajinan(start_date=None, end_date=None):
                     ROUND(
                         CASE 
                             WHEN COUNT(*) FILTER (WHERE id_status = 1) > 0 
-                            THEN SUM(poin_hari_ini) / COUNT(*) FILTER (WHERE id_status = 1) 
+                            THEN SUM(poin_hari_ini)::numeric / COUNT(*) FILTER (WHERE id_status = 1)
                             ELSE 0 
                         END, 2
-                    ) AS poin
+                    ) AS poin,
+                    (
+                        TIME '07:45' - make_interval(mins => 
+                                ROUND(
+                                    CASE 
+                                        WHEN COUNT(*) FILTER (WHERE id_status = 1) > 0 
+                                        THEN SUM(poin_hari_ini)::numeric / COUNT(*) FILTER (WHERE id_status = 1) 
+                                        ELSE 0 
+                                    END
+                                )::int
+                            )
+                        ) AS rata_rata_checkin
                 FROM rekap
                 GROUP BY id_karyawan, nama, jenis
                 ORDER BY poin DESC;
@@ -111,7 +109,7 @@ def get_leaderboard_kerajinan(start_date=None, end_date=None):
                 'start_date': start_date,
                 'end_date': end_date
             })
-            return [decimal_to_float(dict(row)) for row in result.mappings()]
+            return [{k: serialize_time(v) for k, v in dict(row).items()} for row in result.mappings()]
     except SQLAlchemyError as e:
         print(f"Error occurred: {str(e)}")
         return []
