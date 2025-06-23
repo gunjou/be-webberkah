@@ -70,12 +70,12 @@ class AddAbsensiResource(Resource):
             total_jam_kerja = None
         else:
             total_jam_kerja = hitung_waktu_kerja(
-                datetime.strptime(jam_masuk, "%H:%M"),
-                datetime.strptime(jam_keluar, "%H:%M")
+                datetime.strptime(jam_masuk, "%H:%M").time(),
+                datetime.strptime(jam_keluar, "%H:%M").time()
             )
-            jam_kurang = hitung_jam_kurang(datetime.strptime(jam_keluar, "%H:%M"))
+            jam_kurang = hitung_jam_kurang(datetime.strptime(jam_keluar, "%H:%M").time())
 
-        jam_terlambat = hitung_keterlambatan(datetime.strptime(jam_masuk, "%H:%M"))
+        jam_terlambat = hitung_keterlambatan(datetime.strptime(jam_masuk, "%H:%M").time())
 
         result = add_absensi(
             id_karyawan=id_karyawan,

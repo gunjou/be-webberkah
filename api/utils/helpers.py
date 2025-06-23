@@ -9,16 +9,32 @@ def hitung_waktu_kerja(jam_masuk, jam_keluar):
     return max(total_keluar - total_masuk, 0)
 
 def hitung_keterlambatan(jam_masuk):
-    wita = pytz.timezone("Asia/Makassar")
-    if jam_masuk.tzinfo is not None:
-        jam_masuk = jam_masuk.astimezone(wita)
-    # Buang detik dan mikrodetik
-    jam_masuk = jam_masuk.replace(second=0, microsecond=0)
-    jam_masuk_batas = time(8, 0)
-    if jam_masuk <= jam_masuk_batas:
+    jam_batas = time(8, 0)
+    
+    if isinstance(jam_masuk, str):
+        try:
+            jam_masuk_obj = datetime.strptime(jam_masuk, "%H:%M:%S").time()
+        except ValueError:
+            try:
+                jam_masuk_obj = datetime.strptime(jam_masuk, "%H:%M").time()
+            except ValueError:
+                return None
+    elif isinstance(jam_masuk, datetime):
+        # Konversi ke WITA jika ada tzinfo
+        if jam_masuk.tzinfo is not None:
+            wita = pytz.timezone("Asia/Makassar")
+            jam_masuk = jam_masuk.astimezone(wita)
+        jam_masuk_obj = jam_masuk.time().replace(second=0, microsecond=0)
+    elif isinstance(jam_masuk, time):
+        jam_masuk_obj = jam_masuk.replace(second=0, microsecond=0)
+    else:
+        return None
+
+    # Bandingkan dengan jam batas
+    if jam_masuk_obj <= jam_batas:
         return None  # Tidak terlambat
-    # Hitung keterlambatan dalam menit
-    return (jam_masuk.hour * 60 + jam_masuk.minute) - (jam_masuk_batas.hour * 60 + jam_masuk_batas.minute)
+    delta = datetime.combine(date.today(), jam_masuk_obj) - datetime.combine(date.today(), jam_batas)
+    return int(delta.total_seconds() // 60)  # Durasi keterlambatan dalam menit
 
 def hitung_jam_kurang(jam_keluar):
     waktu_ideal = time(17, 0)
