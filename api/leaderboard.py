@@ -12,7 +12,7 @@ leaderboard_parser = reqparse.RequestParser()
 leaderboard_parser.add_argument('start_date', type=str, required=False, help='Format: YYYY-MM-DD')
 leaderboard_parser.add_argument('end_date', type=str, required=False, help='Format: YYYY-MM-DD')
 
-@leaderboard_ns.route('/')
+@leaderboard_ns.route('/paling-disiplin')
 class LeaderboardResource(Resource):
     @role_required('admin')
     @leaderboard_ns.expect(leaderboard_parser)
@@ -51,6 +51,49 @@ class LeaderboardResource(Resource):
 
         if hasil is None:
             return {'status': 'Gagal mengambil data peringkat paling rajin'}, 500
+
+        return {
+            'start_date': str(start_date),
+            'end_date': str(end_date),
+            'data': hasil
+        }, 200
+    
+
+@leaderboard_ns.route('/kurang-disiplin')
+class LeaderboardKurangDisiplin(Resource):
+    @role_required('admin')
+    @leaderboard_ns.expect(leaderboard_parser)
+    def get(self):
+        """Akses: (admin), Menampilkan urutan pegawai kurang disiplin berdasarkan jam terlambat"""
+        args = leaderboard_parser.parse_args()
+        today = datetime.today().date()
+
+        raw_start_date = args.get('start_date')
+        raw_end_date = args.get('end_date')
+
+        start_date = raw_start_date if raw_start_date not in [None, ""] else None
+        end_date = raw_end_date if raw_end_date not in [None, ""] else None
+
+        try:
+            if isinstance(start_date, str):
+                start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+            if isinstance(end_date, str):
+                end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
+        except ValueError:
+            return {'message': 'Format tanggal tidak valid. Gunakan YYYY-MM-DD.'}, 400
+
+        if start_date is None and end_date is None:
+            start_date = today.replace(day=1)
+            end_date = today
+        elif start_date is not None and end_date is None:
+            end_date = today
+        elif end_date is not None and start_date is None:
+            start_date = end_date.replace(day=1)
+
+        hasil = get_leaderboard_kurang_disiplin(start_date, end_date)
+
+        if hasil is None:
+            return {'status': 'Gagal mengambil data leaderboard kurang disiplin'}, 500
 
         return {
             'start_date': str(start_date),
