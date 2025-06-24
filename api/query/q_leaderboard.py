@@ -1,5 +1,4 @@
 from datetime import datetime
-from decimal import Decimal
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from calendar import monthrange

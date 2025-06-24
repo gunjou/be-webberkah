@@ -1,4 +1,4 @@
-from datetime import datetime, time, date
+from datetime import datetime, time, date, timedelta
 from decimal import Decimal
 import pytz
 
@@ -54,6 +54,25 @@ def hitung_jam_kurang(jam_keluar):
         delta = datetime.combine(date.today(), waktu_ideal) - datetime.combine(date.today(), jam_keluar_obj)
         return int(delta.total_seconds() // 60)
     return None
+
+def format_jam_menit(menit):
+    if menit is None:
+        return ""
+    jam = menit // 60
+    menit_sisa = menit % 60
+    parts = []
+    if jam > 0:
+        parts.append(f"{jam} jam")
+    if menit_sisa > 0:
+        parts.append(f"{menit_sisa} menit")
+    return " ".join(parts) if parts else "0 menit"
+
+def time_to_str(value):
+    return value.strftime('%H:%M:%S') if isinstance(value, time) else None
+
+def daterange(start_date, end_date):
+    for n in range((end_date - start_date).days + 1):
+        yield start_date + timedelta(days=n)
 
 def decimal_to_float(row):
     return {

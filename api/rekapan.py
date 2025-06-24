@@ -3,7 +3,9 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime, date, timedelta
 import calendar
 from .utils.decorator import role_required
-from .query.q_rekapan import get_list_rekapan_person, get_rekap_absensi, get_rekap_person
+from .utils.helpers import format_jam_menit
+from .query.q_rekapan import *
+
 
 rekapan_ns = Namespace('rekapan', description='Rekap Absensi')
 
@@ -11,17 +13,10 @@ rekap_absensi_parser = reqparse.RequestParser()
 rekap_absensi_parser.add_argument('start', type=str, required=False, help='Tanggal awal (DD-MM-YYYY)')
 rekap_absensi_parser.add_argument('end', type=str, required=False, help='Tanggal akhir (DD-MM-YYYY)')
 
-def format_jam_menit(menit):
-    if menit is None:
-        return ""
-    jam = menit // 60
-    menit_sisa = menit % 60
-    parts = []
-    if jam > 0:
-        parts.append(f"{jam} jam")
-    if menit_sisa > 0:
-        parts.append(f"{menit_sisa} menit")
-    return " ".join(parts) if parts else "0 menit"
+detail_absensi_parser = reqparse.RequestParser()
+detail_absensi_parser.add_argument('id_karyawan', type=int, required=True, help='ID karyawan')
+detail_absensi_parser.add_argument('start_date', type=str, required=False, help='Tanggal awal (DD-MM-YYYY)')
+detail_absensi_parser.add_argument('end_date', type=str, required=False, help='Tanggal akhir (DD-MM-YYYY)')
 
 
 @rekapan_ns.route('/absensi')
@@ -48,12 +43,13 @@ class RekapAbsensi(Resource):
         today = date.today()
         end = min(end_input, today)
 
-        data = get_rekap_absensi(start, end)
+        libur_nasional = get_libur_nasional(start, end)
+        data = get_rekap_absensi(start, end, libur_nasional)
 
         current_date = start
         hari_valid = 0
         while current_date <= end:
-            if current_date.weekday() != 6:
+            if current_date.weekday() != 6 and current_date not in libur_nasional:
                 hari_valid += 1
             current_date += timedelta(days=1)
 
@@ -74,6 +70,36 @@ class RekapAbsensi(Resource):
             'rekap': data
         }, 200
 
+
+@rekapan_ns.route('/absensi/detail')
+class DetailAbsensi(Resource):
+    @rekapan_ns.expect(detail_absensi_parser)
+    @role_required('admin')
+    def get(self):
+        """Akses: (admin), Mengambil list detail absensi dari karyawan berdasarkan periode"""
+        args = detail_absensi_parser.parse_args()
+        id_karyawan = args.get('id_karyawan')
+        start_param = args.get('start_date')
+        end_param = args.get('end_date')
+
+        if not id_karyawan:
+            rekapan_ns.abort(400, 'Parameter id_karyawan wajib diisi')
+
+        today = datetime.today().date()
+
+        try:
+            if start_param and end_param:
+                start_input = datetime.strptime(start_param, "%d-%m-%Y").date()
+                end_input = datetime.strptime(end_param, "%d-%m-%Y").date()
+            else:
+                today = date.today()
+                start_input = date(today.year, today.month, 1)
+                end_input = date(today.year, today.month, calendar.monthrange(today.year, today.month)[1])
+        except ValueError:
+            return {'status': 'Format tanggal tidak valid. Gunakan format DD-MM-YYYY'}, 400
+
+        return get_detail_absensi_by_karyawan(id_karyawan, start_input, end_input)
+    
 
 @rekapan_ns.route('/rekap')
 class RekapBulananPerson(Resource):
