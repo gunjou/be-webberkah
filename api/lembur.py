@@ -4,14 +4,16 @@ from flask import current_app, request, send_from_directory, abort
 from flask_restx import Namespace, Resource, fields, reqparse
 from werkzeug.utils import secure_filename
 from werkzeug.datastructures import FileStorage
-from flask_jwt_extended import get_jwt_identity, jwt_required
+from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
 
 from .utils.decorator import role_required
 from .query.q_lembur import *
 
+
 lembur_ns = Namespace('lembur', description='Manajemen Pengajuan Lembur')
 
 lembur_parser = lembur_ns.parser()
+lembur_parser.add_argument('id_karyawan', type=int, required=False, location='form', help='Wajib diisi jika role admin')
 lembur_parser.add_argument('tanggal', type=str, required=True, location='form', help='Format: DD-MM-YYYY')
 lembur_parser.add_argument('jam_mulai', type=str, required=True, location='form', help='Format: HH:MM')
 lembur_parser.add_argument('jam_selesai', type=str, required=True, location='form', help='Format: HH:MM')
@@ -24,15 +26,25 @@ ALLOWED_EXTENSIONS = {'pdf', 'jpg', 'jpeg', 'png'}
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+
 @lembur_ns.route('/pengajuan')
 class PengajuanLemburResource(Resource):
     @lembur_ns.expect(lembur_parser)
     @jwt_required()
     def post(self):
-        """Akses: (karyawan), Ajukan lembur"""
+        """Akses: (admin/karyawan), Ajukan lembur"""
         args = lembur_parser.parse_args()
         file = args['file']
-        id_karyawan = get_jwt_identity()
+        current_user_id = get_jwt_identity()
+        current_role = get_jwt()['role']  # Ambil role dari token
+
+        # Tentukan id_karyawan
+        if current_role == 'admin':
+            if not args['id_karyawan']:
+                return {'status': 'id_karyawan wajib diisi oleh admin'}, 400
+            id_karyawan = args['id_karyawan']
+        else:
+            id_karyawan = current_user_id  # karyawan
 
         # Upload file jika ada
         path_lampiran = None
@@ -49,17 +61,14 @@ class PengajuanLemburResource(Resource):
         elif file:
             return {'status': 'Ekstensi file tidak diizinkan'}, 400
 
-        # Format waktu dan tanggal
         tanggal = datetime.strptime(args['tanggal'], "%d-%m-%Y").date()
         jam_mulai = datetime.strptime(args['jam_mulai'], "%H:%M").time()
         jam_selesai = datetime.strptime(args['jam_selesai'], "%H:%M").time()
 
-        # Hitung bayaran lembur
         result_hitung = hitung_bayaran_lembur(id_karyawan, tanggal, jam_mulai, jam_selesai)
         if result_hitung is None:
             return {'status': 'Gagal menghitung bayaran lembur'}, 500
 
-        # Data lengkap yang akan dikirim ke query
         data = {
             'id_karyawan': id_karyawan,
             'tanggal': tanggal,
