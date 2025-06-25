@@ -62,8 +62,26 @@ class PengajuanLemburResource(Resource):
             return {'status': 'Ekstensi file tidak diizinkan'}, 400
 
         tanggal = datetime.strptime(args['tanggal'], "%d-%m-%Y").date()
-        jam_mulai = datetime.strptime(args['jam_mulai'], "%H:%M").time()
-        jam_selesai = datetime.strptime(args['jam_selesai'], "%H:%M").time()
+
+        if args['jam_mulai'] == args['jam_selesai']:
+            return {'status': 'Jam mulai dan selesai tidak boleh sama'}, 400
+        
+        # Konversi jam_mulai
+        if args['jam_mulai'].strip() == '24:00':
+            jam_mulai = time(0, 0)
+        else:
+            try:
+                jam_mulai = datetime.strptime(args['jam_mulai'], "%H:%M").time()
+            except ValueError:
+                return {'status': 'Format jam_mulai tidak valid (gunakan HH:MM)'}, 400
+        # Konversi jam_selesai
+        if args['jam_selesai'].strip() == '24:00':
+            jam_selesai = time(0, 0)
+        else:
+            try:
+                jam_selesai = datetime.strptime(args['jam_selesai'], "%H:%M").time()
+            except ValueError:
+                return {'status': 'Format jam_selesai tidak valid (gunakan HH:MM)'}, 400
 
         result_hitung = hitung_bayaran_lembur(id_karyawan, tanggal, jam_mulai, jam_selesai)
         if result_hitung is None:
