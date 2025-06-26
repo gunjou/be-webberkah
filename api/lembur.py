@@ -181,3 +181,14 @@ class TolakLemburResource(Resource):
             return {'status': 'ID lembur tidak ditemukan atau sudah tidak aktif'}, 404
 
         return {'status': 'Lembur berhasil ditolak'}, 200
+
+
+@lembur_ns.route('/<int:id_lembur>')
+class HapusLembur(Resource):
+    @jwt_required()
+    def delete(self, id_lembur):
+        """Akses: (admin/karyawan), Hapus (soft-delete) lembur"""
+        success = hapus_lembur(id_lembur)
+        if success:
+            return {"status": "Berhasil menghapus lembur"}, 200
+        return {"status": "Gagal menghapus lembur"}, 500

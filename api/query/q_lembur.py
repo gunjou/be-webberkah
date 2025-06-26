@@ -127,7 +127,7 @@ def get_daftar_lembur(status_lembur=None, id_karyawan=None, tanggal=None):
                 params['id_karyawan'] = int(id_karyawan)
             if tanggal:
                 query += " AND l.tanggal = :tanggal"
-                params['tanggal'] = tanggal  # format YYYY-MM-DD (string)
+                params['tanggal'] = tanggal
 
             query += " ORDER BY l.created_at DESC"
 
@@ -139,12 +139,28 @@ def get_daftar_lembur(status_lembur=None, id_karyawan=None, tanggal=None):
                     key: value.isoformat() if isinstance(value, (datetime, date, time)) else value
                     for key, value in row.items()
                 }
+
+                # Hitung jam lembur
+                jam_mulai = row['jam_mulai']
+                jam_selesai = row['jam_selesai']
+                if isinstance(jam_mulai, time) and isinstance(jam_selesai, time):
+                    mulai_dt = datetime.combine(date.today(), jam_mulai)
+                    selesai_dt = datetime.combine(date.today(), jam_selesai)
+                    if jam_selesai <= jam_mulai:
+                        selesai_dt += timedelta(days=1)
+                    durasi = selesai_dt - mulai_dt
+                    jam_lembur = round(durasi.total_seconds() / 3600, 2)
+                    row_dict['jam_lembur'] = jam_lembur
+                else:
+                    row_dict['jam_lembur'] = None
+
                 data.append(row_dict)
 
             return data
     except SQLAlchemyError as e:
         print(f"DB Error: {str(e)}")
         return None
+
 
 def setujui_lembur(id_lembur):
     engine = get_connection()
@@ -183,3 +199,23 @@ def tolak_lembur(id_lembur):
     except SQLAlchemyError as e:
         print(f"[DB Error] Gagal tolak lembur: {e}")
         return None
+
+def hapus_lembur(id_lembur):
+    engine = get_connection()
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text("""
+                    UPDATE lembur
+                    SET status = 0, updated_at = :updated_at
+                    WHERE id_lembur = :id_lembur
+                """),
+                {
+                    "id_lembur": id_lembur,
+                    "updated_at": get_wita()
+                }
+            )
+            return True
+    except SQLAlchemyError as e:
+        print(f"DB Error (hapus_lembur): {str(e)}")
+        return False
