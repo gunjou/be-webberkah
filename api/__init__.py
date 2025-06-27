@@ -13,7 +13,7 @@ from .jenis_pegawai import jenis_pegawai_ns
 from .tipe_pegawai import tipe_pegawai_ns
 from .absensi import absensi_ns
 from .rekapan import rekapan_ns
-from .perhitungan_gaji import perhitungan_ns
+from .perhitungan_gaji import perhitungan_gaji_ns
 from .izin_sakit import izin_ns
 from .lembur import lembur_ns
 from .libur import libur_ns
@@ -81,7 +81,7 @@ restx_api.add_namespace(jenis_pegawai_ns, path="/jenis-pegawai")
 restx_api.add_namespace(tipe_pegawai_ns, path="/tipe-pegawai")
 restx_api.add_namespace(absensi_ns, path="/absensi")
 restx_api.add_namespace(rekapan_ns, path="/rekapan")
-restx_api.add_namespace(perhitungan_ns, path="/perhitungan-gaji")
+restx_api.add_namespace(perhitungan_gaji_ns, path="/perhitungan-gaji")
 restx_api.add_namespace(izin_ns, path="/perizinan")
 restx_api.add_namespace(lembur_ns, path="/lembur")
 restx_api.add_namespace(libur_ns, path="/libur")

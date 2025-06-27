@@ -1,139 +1,127 @@
+from datetime import date, timedelta
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from ..utils.config import get_connection
 
 
-def process_rekap_absensi(data):
-    for row in data:
-        gaji_pokok = row.get("gaji_pokok") or 0
-        tipe_karyawan = row.get("tipe", "").lower()
-
-        jumlah_hadir = row.get("jumlah_hadir") or 0
-        jumlah_izin = row.get("jumlah_izin") or 0
-        jumlah_sakit = row.get("jumlah_sakit") or 0
-        dinas_luar = row.get("dinas_luar") or 0
-
-        if tipe_karyawan == 'tetap':
-            hari_dibayar = jumlah_hadir + jumlah_izin + jumlah_sakit + dinas_luar
-        else:
-            hari_dibayar = jumlah_hadir + dinas_luar
-
-        gaji_per_hari = gaji_pokok / 26
-        gaji_per_menit = gaji_pokok / 12480
-
-        total_terlambat = row.get("total_jam_terlambat") or 0
-        total_jam_bolos = row.get("total_jam_kurang") or 0
-        total_jam_kurang = total_terlambat + total_jam_bolos
-
-        potongan = total_jam_kurang * gaji_per_menit
-        gaji_kotor = hari_dibayar * gaji_per_hari
-        gaji_bersih = max(gaji_kotor - potongan, 0)
-
-        row['hari_dibayar'] = hari_dibayar
-        row['gaji_per_hari'] = round(gaji_per_hari)
-        row['gaji_kotor'] = round(gaji_kotor)
-        row['potongan'] = round(potongan)
-        row['gaji_bersih'] = round(gaji_bersih)
-        row['total_jam_bolos'] = total_jam_bolos
-        row['total_jam_kurang'] = total_jam_kurang
-
-    return data
-
-
-def process_rekap_absensi_by_id(data):
-    gaji_pokok = data.get("gaji_pokok") or 0
-    tipe_karyawan = data.get("tipe", "").lower()
-
-    jumlah_hadir = data.get("jumlah_hadir") or 0
-    jumlah_izin = data.get("jumlah_izin") or 0
-    jumlah_sakit = data.get("jumlah_sakit") or 0
-    dinas_luar = data.get("dinas_luar") or 0
-
-    if tipe_karyawan == 'tetap':
-        hari_dibayar = jumlah_hadir + jumlah_izin + jumlah_sakit + dinas_luar
-    else:
-        hari_dibayar = jumlah_hadir + dinas_luar
-
-    gaji_per_hari = gaji_pokok / 26
-    gaji_per_menit = gaji_pokok / 12480
-
-    gaji_kotor = hari_dibayar * gaji_per_hari
-
-    total_terlambat = data.get("total_jam_terlambat") or 0
-    total_kurang = data.get("total_jam_kurang") or 0
-    total_potongan_menit = total_terlambat + total_kurang
-    potongan = total_potongan_menit * gaji_per_menit
-
-    gaji_bersih = max(gaji_kotor - potongan, 0)
-
-    data['hari_dibayar'] = hari_dibayar
-    data['gaji_per_hari'] = round(gaji_per_hari)
-    data['gaji_kotor'] = round(gaji_kotor)
-    data['potongan'] = round(potongan)
-    data['gaji_bersih'] = round(gaji_bersih)
-
-    return data
-
-
-def get_rekap_absensi(start_date, end_date):
+def get_libur_nasional(start_date: date, end_date: date):
     engine = get_connection()
     try:
         with engine.connect() as connection:
             query = text("""
-                SELECT 
-                    k.id_karyawan,
-                    k.nama_lengkap,
-                    k.gaji_pokok,
-                    k.tipe,
-                    COUNT(CASE WHEN a.status = 'hadir' THEN 1 END) AS jumlah_hadir,
-                    COUNT(CASE WHEN a.status = 'izin' THEN 1 END) AS jumlah_izin,
-                    COUNT(CASE WHEN a.status = 'sakit' THEN 1 END) AS jumlah_sakit,
-                    COUNT(CASE WHEN a.status = 'dinas_luar' THEN 1 END) AS dinas_luar,
-                    SUM(a.keterlambatan) AS total_jam_terlambat,
-                    SUM(a.kurang_jam) AS total_jam_kurang
-                FROM absensi a
-                JOIN karyawan k ON a.id_karyawan = k.id_karyawan
-                WHERE a.tanggal BETWEEN :start_date AND :end_date
-                GROUP BY k.id_karyawan, k.nama_lengkap, k.gaji_pokok, k.tipe
+                SELECT tanggal FROM liburnasional
+                WHERE tanggal BETWEEN :start_date AND :end_date
             """)
-            result = connection.execute(query, {'start_date': start_date, 'end_date': end_date})
-            data = [dict(row) for row in result.mappings()]
-            return process_rekap_absensi(data)
+            result = connection.execute(query, {'start_date': start_date, 'end_date': end_date}).mappings()
+            return set(row['tanggal'] for row in result)
     except SQLAlchemyError as e:
-        print(f"Error occurred: {str(e)}")
-        return []
+        print(f"Error: {str(e)}")
+        return set()
 
-
-def get_rekap_absensi_by_id(start_date, end_date, id_karyawan):
+def get_rekap_gaji(start_date: date, end_date: date, id_karyawan=None):
     engine = get_connection()
     try:
         with engine.connect() as connection:
-            query = text("""
+            libur_set = get_libur_nasional(start_date, end_date)
+
+            # Hitung hari kerja optimal
+            hari_optimal = sum(
+                1 for i in range((end_date - start_date).days + 1)
+                if (d := start_date + timedelta(days=i)).weekday() != 6 and d not in libur_set
+            )
+
+            # Build query dinamis
+            query = """
                 SELECT 
-                    k.id_karyawan,
-                    k.nama_lengkap,
-                    k.gaji_pokok,
-                    k.tipe,
-                    COUNT(CASE WHEN a.status = 'hadir' THEN 1 END) AS jumlah_hadir,
-                    COUNT(CASE WHEN a.status = 'izin' THEN 1 END) AS jumlah_izin,
-                    COUNT(CASE WHEN a.status = 'sakit' THEN 1 END) AS jumlah_sakit,
-                    COUNT(CASE WHEN a.status = 'dinas_luar' THEN 1 END) AS dinas_luar,
-                    SUM(a.keterlambatan) AS total_jam_terlambat,
-                    SUM(a.kurang_jam) AS total_jam_kurang
+                    k.id_karyawan, k.nama, k.gaji_pokok, 
+                    jk.id_jenis, jk.jenis, 
+                    tk.id_tipe, tk.tipe,
+                    SUM(a.jam_terlambat) AS total_jam_terlambat,
+                    SUM(a.jam_kurang) AS total_jam_kurang,
+                    SUM(a.total_jam_kerja) AS total_jam_kerja,
+                    COUNT(sp.nama_status) FILTER (WHERE sp.nama_status = 'Hadir') AS jumlah_hadir,
+                    COUNT(sp.nama_status) FILTER (WHERE sp.nama_status = 'Izin') AS jumlah_izin,
+                    COUNT(sp.nama_status) FILTER (WHERE sp.nama_status = 'Sakit') AS jumlah_sakit
                 FROM absensi a
                 JOIN karyawan k ON a.id_karyawan = k.id_karyawan
+                LEFT JOIN statuspresensi sp ON a.id_status = sp.id_status
+                LEFT JOIN jeniskaryawan jk ON k.id_jenis = jk.id_jenis
+                LEFT JOIN tipekaryawan tk ON k.id_tipe = tk.id_tipe
                 WHERE a.tanggal BETWEEN :start_date AND :end_date
-                AND a.id_karyawan = :id_karyawan
-                GROUP BY k.id_karyawan, k.nama_lengkap, k.gaji_pokok, k.tipe
+            """
+            params = {'start_date': start_date, 'end_date': end_date}
+
+            if id_karyawan:
+                query += " AND a.id_karyawan = :id_karyawan"
+                params['id_karyawan'] = id_karyawan
+
+            query += """
+                GROUP BY k.id_karyawan, k.nama, k.gaji_pokok, jk.id_jenis, jk.jenis, tk.id_tipe, tk.tipe
+            """
+            rows = connection.execute(text(query), params).mappings().fetchall()
+
+            # Ambil total_bayaran lembur approved
+            lembur_query = text("""
+                SELECT id_karyawan, SUM(total_bayaran) AS total_bayaran
+                FROM lembur
+                WHERE tanggal BETWEEN :start_date AND :end_date
+                  AND status_lembur = 'approved' AND status = 1
+                GROUP BY id_karyawan
             """)
-            result = connection.execute(query, {
-                'start_date': start_date,
-                'end_date': end_date,
-                'id_karyawan': id_karyawan
-            })
-            row = result.mappings().fetchone()
-            return process_rekap_absensi_by_id(dict(row)) if row else None
+            lembur_map = {
+                row['id_karyawan']: row['total_bayaran']
+                for row in connection.execute(lembur_query, {'start_date': start_date, 'end_date': end_date}).mappings()
+            }
+
+            # Ambil tunjangan kehadiran (checkout sebelum 07:46)
+            tunjangan_query = text("""
+                SELECT id_karyawan, COUNT(*) AS jumlah
+                FROM absensi
+                WHERE tanggal BETWEEN :start_date AND :end_date
+                  AND jam_masuk < '07:46:00'
+                  AND status = 1
+                GROUP BY id_karyawan
+            """)
+            tunjangan_map = {
+                row['id_karyawan']: row['jumlah']
+                for row in connection.execute(tunjangan_query, {'start_date': start_date, 'end_date': end_date}).mappings()
+            }
+
+            result = []
+            for row in rows:
+                id_karyawan = row['id_karyawan']
+                gaji_pokok = row['gaji_pokok']
+                gaji_perhari = gaji_pokok / hari_optimal if hari_optimal else 0
+                gaji_perjam = gaji_perhari / 8
+                gaji_permenit = gaji_perjam / 60
+
+                jumlah_hari_dibayar = min(
+                    sum([row['jumlah_hadir'], row['jumlah_izin'], row['jumlah_sakit']]),
+                    hari_optimal
+                )
+                total_upah = round(gaji_perhari * jumlah_hari_dibayar, 2)
+                terlambat = row['total_jam_terlambat'] or 0 # helper
+                jam_kurang = row['total_jam_kurang'] or 0 # helper
+                total_potongan = round(gaji_permenit * (terlambat + jam_kurang), 2)
+                total_bayaran_lembur = lembur_map.get(id_karyawan) or 0.0
+                tunjangan_kehadiran = (tunjangan_map.get(id_karyawan) or 0) * 10000
+
+                gaji_bersih = total_upah - total_potongan + (total_bayaran_lembur or 0) + (tunjangan_kehadiran or 0)
+
+                result.append({
+                    **row,
+                    'hari_optimal': hari_optimal,
+                    'gaji_perhari': round(gaji_perhari, 2),
+                    'gaji_perjam': round(gaji_perjam, 2),
+                    'gaji_permenit': round(gaji_permenit, 4),
+                    'total_upah': total_upah,
+                    'total_potongan': total_potongan,
+                    'total_bayaran_lembur': total_bayaran_lembur,
+                    'tunjangan_kehadiran': tunjangan_kehadiran,
+                    'gaji_bersih': round(gaji_bersih, 2)
+                })
+            return result
     except SQLAlchemyError as e:
-        print(f"Error occurred: {str(e)}")
+        print(f"DB Error: {str(e)}")
         return []
