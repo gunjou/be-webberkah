@@ -85,7 +85,7 @@ def get_leaderboard_kerajinan(start_date=None, end_date=None):
                     ROUND(
                         CASE 
                             WHEN COUNT(*) FILTER (WHERE id_status = 1) > 0 
-                            THEN SUM(poin_hari_ini)::numeric / COUNT(*) FILTER (WHERE id_status = 1)
+                            THEN SUM(poin_hari_ini)::numeric / 26
                             ELSE 0 
                         END, 2
                     ) AS poin,
