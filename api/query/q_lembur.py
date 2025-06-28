@@ -160,7 +160,49 @@ def get_daftar_lembur(status_lembur=None, id_karyawan=None, tanggal=None):
     except SQLAlchemyError as e:
         print(f"DB Error: {str(e)}")
         return None
+    
+def get_daftar_lembur_oleh_karyawan(id_karyawan, tanggal=None):
+    if tanggal is None:
+        tanggal = date.today()
 
+    engine = get_connection()
+    try:
+        with engine.connect() as connection:
+            query = """
+                SELECT l.id_lembur, l.id_karyawan, k.nama AS nama_karyawan,
+                       l.tanggal, l.jam_mulai, l.jam_selesai,
+                       l.keterangan, l.path_lampiran, l.status_lembur,
+                       l.alasan_penolakan, l.bayaran_perjam, l.total_bayaran,
+                       l.created_at, l.updated_at
+                FROM lembur l
+                JOIN karyawan k ON l.id_karyawan = k.id_karyawan
+                WHERE l.status = 1
+                  AND l.id_karyawan = :id_karyawan
+                  AND l.tanggal = :tanggal
+                ORDER BY l.created_at DESC
+            """
+            params = {
+                'id_karyawan': id_karyawan,
+                'tanggal': tanggal
+            }
+
+            result = connection.execute(text(query), params).mappings().fetchall()
+
+            data = []
+            for row in result:
+                row_dict = {}
+                for key, value in row.items():
+                    if isinstance(value, (datetime, date, time)):
+                        row_dict[key] = value.isoformat()
+                    else:
+                        row_dict[key] = value
+                data.append(row_dict)
+
+            return data
+
+    except SQLAlchemyError as e:
+        print(f"DB Error: {str(e)}")
+        return None
 
 def setujui_lembur(id_lembur):
     engine = get_connection()

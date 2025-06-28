@@ -151,6 +151,33 @@ class PreviewLampiranLembur(Resource):
             abort(404, description='File tidak ditemukan')
 
         return send_from_directory(folder, filename)
+    
+
+@lembur_ns.route('/by-karyawan')
+class LemburByKaryawan(Resource):
+    @role_required('karyawan')
+    @lembur_ns.doc(params={
+        'tanggal': 'Filter lembur berdasarkan tanggal tertentu (format: DD-MM-YYYY), default: hari ini'
+    })
+    def get(self):
+        """Akses: (karyawan), Menampilkan lembur berdasarkan tanggal (default: hari ini) untuk user login"""
+        try:
+            tanggal_str = request.args.get('tanggal')
+            if tanggal_str:
+                tanggal = datetime.strptime(tanggal_str, "%d-%m-%Y").date()
+            else:
+                tanggal = date.today()
+
+            id_karyawan = get_jwt_identity()
+
+            hasil = get_daftar_lembur_oleh_karyawan(id_karyawan, tanggal)
+
+            if hasil is None:
+                return {'status': 'Gagal mengambil data lembur'}, 500
+
+            return {'data': hasil}, 200
+        except Exception as e:
+            return {'status': 'Error', 'message': str(e)}, 400
 
 
 @lembur_ns.route('/<int:id_lembur>/setujui')
