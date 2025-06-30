@@ -43,13 +43,13 @@ def allowed_file(filename):
 
 @izin_ns.route('/')
 class PengajuanIzinResource(Resource):
-    @role_required('admin')
+    @jwt_required()
     @izin_ns.doc(params={
         'status_izin': 'Filter berdasarkan status izin (pending, approved, rejected)',
         'id_karyawan': 'Filter berdasarkan ID karyawan'
     })
     def get(self):
-        """Akses: (admin), Menampilkan semua data izin, bisa difilter per status atau per karyawan"""
+        """Akses: (admin, karyawan), Menampilkan semua data izin, bisa difilter per status atau per karyawan"""
         status_izin = request.args.get('status_izin')
         id_karyawan = request.args.get('id_karyawan')
 

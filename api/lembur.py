@@ -107,14 +107,14 @@ class PengajuanLemburResource(Resource):
 
 @lembur_ns.route('/')
 class DaftarLemburResource(Resource):
-    @role_required('admin')
+    @jwt_required()
     @lembur_ns.doc(params={
         'status_lembur': 'Filter berdasarkan status lembur (pending, approved, rejected)',
         'id_karyawan': 'Filter berdasarkan ID karyawan',
         'tanggal': 'Filter berdasarkan tanggal lembur (format: YYYY-MM-DD)'
     })
     def get(self):
-        """Akses: (admin), Menampilkan semua data lembur, bisa difilter per status, karyawan, atau tanggal"""
+        """Akses: (admin, karyawan), Menampilkan semua data lembur, bisa difilter per status, karyawan, atau tanggal"""
         status_lembur = request.args.get('status_lembur')
         id_karyawan = request.args.get('id_karyawan')
         tanggal = request.args.get('tanggal')
