@@ -10,15 +10,15 @@ def daterange(start_date, end_date):
     for n in range(int((end_date - start_date).days) + 1):
         yield start_date + timedelta(n)
 
-def get_daftar_izin(status_izin=None, id_karyawan=None):
+def get_daftar_izin(status_izin=None, id_karyawan=None, start_date=None, end_date=None, tanggal=None):
     engine = get_connection()
     try:
         with engine.connect() as connection:
             query = """
                 SELECT i.id_izin, i.id_karyawan, k.nama AS nama_karyawan, j.nama_status, 
-                    i.keterangan, i.tgl_mulai, i.tgl_selesai, 
-                    i.path_lampiran, i.status_izin, i.alasan_penolakan,
-                    i.created_at, i.updated_at
+                       i.keterangan, i.tgl_mulai, i.tgl_selesai, 
+                       i.path_lampiran, i.status_izin, i.alasan_penolakan,
+                       i.created_at, i.updated_at
                 FROM izin i
                 JOIN karyawan k ON i.id_karyawan = k.id_karyawan
                 JOIN statuspresensi j ON i.id_jenis = j.id_status
@@ -32,6 +32,14 @@ def get_daftar_izin(status_izin=None, id_karyawan=None):
             if id_karyawan:
                 query += " AND i.id_karyawan = :id_karyawan"
                 params['id_karyawan'] = int(id_karyawan)
+
+            if tanggal:
+                query += " AND :tanggal BETWEEN i.tgl_mulai AND i.tgl_selesai"
+                params['tanggal'] = tanggal
+            elif start_date and end_date:
+                query += " AND i.tgl_mulai BETWEEN :start_date AND :end_date"
+                params['start_date'] = start_date
+                params['end_date'] = end_date
 
             query += " ORDER BY i.created_at DESC"
 
@@ -52,6 +60,7 @@ def get_daftar_izin(status_izin=None, id_karyawan=None):
     except SQLAlchemyError as e:
         print(f"DB Error: {str(e)}")
         return None
+
 
 def get_daftar_izin_oleh_karyawan(id_karyawan, tanggal=None):
     if tanggal is None:

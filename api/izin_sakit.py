@@ -1,3 +1,4 @@
+import calendar
 from datetime import time
 import os
 from flask import current_app, request, send_from_directory, abort
@@ -46,19 +47,49 @@ class PengajuanIzinResource(Resource):
     @jwt_required()
     @izin_ns.doc(params={
         'status_izin': 'Filter berdasarkan status izin (pending, approved, rejected)',
-        'id_karyawan': 'Filter berdasarkan ID karyawan'
+        'id_karyawan': 'Filter berdasarkan ID karyawan',
+        'tanggal': 'Filter tunggal berdasarkan tanggal (format: YYYY-MM-DD)',
+        'start_date': 'Tanggal mulai rentang izin (format: YYYY-MM-DD)',
+        'end_date': 'Tanggal akhir rentang izin (format: YYYY-MM-DD)'
     })
     def get(self):
-        """Akses: (admin, karyawan), Menampilkan semua data izin, bisa difilter per status atau per karyawan"""
+        """Akses: (admin, karyawan), Menampilkan semua data izin, bisa difilter per status, karyawan, atau tanggal"""
         status_izin = request.args.get('status_izin')
         id_karyawan = request.args.get('id_karyawan')
+        tanggal_str = request.args.get('tanggal')
+        start_date_str = request.args.get('start_date')
+        end_date_str = request.args.get('end_date')
 
-        hasil = get_daftar_izin(status_izin, id_karyawan)
+        try:
+            # Validasi eksklusif: hanya boleh salah satu
+            if tanggal_str and (start_date_str or end_date_str):
+                return {'status': 'error', 'message': 'Gunakan hanya salah satu: `tanggal` atau (`start_date` dan `end_date`)'}, 400
 
-        if hasil is None:
-            return {'status': 'Gagal mengambil data izin'}, 500
+            tanggal = start_date = end_date = None
 
-        return {'data': hasil}, 200
+            if tanggal_str:
+                tanggal = datetime.strptime(tanggal_str, "%Y-%m-%d").date()
+            elif start_date_str and end_date_str:
+                start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+                end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+            elif not tanggal_str and not start_date_str and not end_date_str:
+                today = date.today()
+                start_date = date(today.year, today.month, 1)
+                end_date = date(today.year, today.month, calendar.monthrange(today.year, today.month)[1])
+            else:
+                return {'status': 'error', 'message': 'Untuk rentang tanggal, `start_date` dan `end_date` harus diisi lengkap'}, 400
+
+            hasil = get_daftar_izin(status_izin, id_karyawan, start_date, end_date, tanggal)
+
+            if hasil is None:
+                return {'status': 'Gagal mengambil data izin'}, 500
+
+            return {'data': hasil}, 200
+
+        except ValueError:
+            return {'status': 'error', 'message': 'Format tanggal harus YYYY-MM-DD'}, 400
+        except Exception as e:
+            return {'status': 'error', 'message': str(e)}, 500
     
     @izin_ns.expect(izin_parser)
     @role_required('karyawan')

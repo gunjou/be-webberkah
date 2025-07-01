@@ -1,3 +1,4 @@
+import calendar
 from datetime import datetime, time
 import os
 from flask import current_app, request, send_from_directory, abort
@@ -111,15 +112,43 @@ class DaftarLemburResource(Resource):
     @lembur_ns.doc(params={
         'status_lembur': 'Filter berdasarkan status lembur (pending, approved, rejected)',
         'id_karyawan': 'Filter berdasarkan ID karyawan',
-        'tanggal': 'Filter berdasarkan tanggal lembur (format: YYYY-MM-DD)'
+        'tanggal': 'Filter lembur berdasarkan satu tanggal tertentu (format: YYYY-MM-DD)',
+        'start_date': 'Tanggal mulai rentang pencarian lembur (format: YYYY-MM-DD)',
+        'end_date': 'Tanggal akhir rentang pencarian lembur (format: YYYY-MM-DD)'
     })
     def get(self):
-        """Akses: (admin, karyawan), Menampilkan semua data lembur, bisa difilter per status, karyawan, atau tanggal"""
-        status_lembur = request.args.get('status_lembur')
-        id_karyawan = request.args.get('id_karyawan')
-        tanggal = request.args.get('tanggal')
+        """Akses: (admin, karyawan), Menampilkan data lembur dengan filter fleksibel berdasarkan status, karyawan, dan tanggal"""
+        args = request.args
+        status_lembur = args.get('status_lembur')
+        id_karyawan = args.get('id_karyawan')
+        tanggal_str = args.get('tanggal')
+        start_date_str = args.get('start_date')
+        end_date_str = args.get('end_date')
 
-        hasil = get_daftar_lembur(status_lembur, id_karyawan, tanggal)
+        try:
+            tanggal = start_date = end_date = None
+
+            # Validasi eksklusif: hanya boleh salah satu jenis filter
+            if tanggal_str and (start_date_str or end_date_str):
+                return {'status': 'error', 'message': 'Gunakan hanya salah satu: `tanggal` atau (`start_date` dan `end_date`)'}, 400
+
+            if tanggal_str:
+                tanggal = datetime.strptime(tanggal_str, "%Y-%m-%d").date()
+            elif start_date_str and end_date_str:
+                start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+                end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+            elif not tanggal_str and not start_date_str and not end_date_str:
+                # fallback default: bulan ini
+                today = date.today()
+                start_date = date(today.year, today.month, 1)
+                end_date = date(today.year, today.month, calendar.monthrange(today.year, today.month)[1])
+            else:
+                return {'status': 'error', 'message': 'Untuk rentang tanggal, isi `start_date` dan `end_date` lengkap'}, 400
+
+        except ValueError:
+            return {'status': 'error', 'message': 'Format tanggal tidak valid. Gunakan YYYY-MM-DD'}, 400
+
+        hasil = get_daftar_lembur(status_lembur, id_karyawan, start_date, end_date, tanggal)
 
         if hasil is None:
             return {'status': 'Gagal mengambil data lembur'}, 500

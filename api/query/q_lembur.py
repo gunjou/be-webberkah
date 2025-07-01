@@ -103,7 +103,7 @@ def insert_pengajuan_lembur(data):
         print("DB Error:", str(e))
         return None
     
-def get_daftar_lembur(status_lembur=None, id_karyawan=None, tanggal=None):
+def get_daftar_lembur(status_lembur=None, id_karyawan=None, start_date=None, end_date=None, tanggal=None):
     engine = get_connection()
     try:
         with engine.connect() as connection:
@@ -125,9 +125,14 @@ def get_daftar_lembur(status_lembur=None, id_karyawan=None, tanggal=None):
             if id_karyawan:
                 query += " AND l.id_karyawan = :id_karyawan"
                 params['id_karyawan'] = int(id_karyawan)
+
             if tanggal:
                 query += " AND l.tanggal = :tanggal"
                 params['tanggal'] = tanggal
+            elif start_date and end_date:
+                query += " AND l.tanggal BETWEEN :start_date AND :end_date"
+                params['start_date'] = start_date
+                params['end_date'] = end_date
 
             query += " ORDER BY l.created_at DESC"
 
@@ -149,8 +154,7 @@ def get_daftar_lembur(status_lembur=None, id_karyawan=None, tanggal=None):
                     if jam_selesai <= jam_mulai:
                         selesai_dt += timedelta(days=1)
                     durasi = selesai_dt - mulai_dt
-                    jam_lembur = round(durasi.total_seconds() / 3600, 2)
-                    row_dict['jam_lembur'] = jam_lembur
+                    row_dict['jam_lembur'] = round(durasi.total_seconds() / 3600, 2)
                 else:
                     row_dict['jam_lembur'] = None
 
