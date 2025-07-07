@@ -71,7 +71,7 @@ def get_login_karyawan(username, password):
 def get_login_admin(username, password):
     engine = get_connection()
     try:
-        with engine.begin() as connection:
+        with engine.connect() as connection:
             # Ambil data admin berdasarkan username
             result = connection.execute(
                 text("""
