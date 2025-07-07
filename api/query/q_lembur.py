@@ -228,6 +228,36 @@ def tolak_lembur(id_lembur):
     except SQLAlchemyError as e:
         print(f"[DB Error] Gagal tolak lembur: {e}")
         return None
+    
+def update_lembur_by_id(data):
+    engine = get_connection()
+    try:
+        with engine.begin() as conn:
+            query = text("""
+                UPDATE lembur
+                SET jam_mulai = :jam_mulai,
+                    jam_selesai = :jam_selesai,
+                    keterangan = :keterangan,
+                    menit_lembur = :menit_lembur,
+                    bayaran_perjam = :bayaran_perjam,
+                    total_bayaran = :total_bayaran,
+                    updated_at = :updated_at
+                WHERE id_lembur = :id_lembur AND status = 1
+            """)
+            conn.execute(query, {
+                "jam_mulai": data['jam_mulai'],
+                "jam_selesai": data['jam_selesai'],
+                "keterangan": data['keterangan'],
+                "menit_lembur": data['menit_lembur'],
+                "bayaran_perjam": data['bayaran_perjam'],
+                "total_bayaran": data['total_bayaran'],
+                "updated_at": get_wita(),
+                "id_lembur": data['id_lembur']
+            })
+            return 1
+    except SQLAlchemyError as e:
+        print(f"Update Lembur Error: {str(e)}")
+        return None
 
 def hapus_lembur(id_lembur):
     engine = get_connection()

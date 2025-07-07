@@ -241,7 +241,66 @@ class TolakLemburResource(Resource):
 
 
 @lembur_ns.route('/<int:id_lembur>')
-class HapusLembur(Resource):
+class EditdanDeleteLemburResource(Resource):
+    @role_required('admin')
+    @lembur_ns.expect(lembur_parser)
+    def put(self, id_lembur):
+        """Akses: (admin), Edit pengajuan lembur"""
+        args = lembur_parser.parse_args()
+        current_user_id = get_jwt_identity()
+        current_role = get_jwt()['role']
+
+        # Cek siapa yang mengedit dan set id_karyawan
+        if current_role == 'admin':
+            if not args['id_karyawan']:
+                return {'status': 'id_karyawan wajib diisi oleh admin'}, 400
+            id_karyawan = args['id_karyawan']
+        else:
+            id_karyawan = current_user_id
+
+        # Ambil data tanggal lembur dari database
+        engine = get_connection()
+        with engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT tanggal FROM lembur WHERE id_lembur = :id_lembur AND status = 1"),
+                {"id_lembur": id_lembur}
+            ).mappings().fetchone()
+            if not row:
+                return {'status': 'Data lembur tidak ditemukan'}, 404
+
+            tanggal = row['tanggal']
+
+        # Validasi dan konversi jam
+        if args['jam_mulai'] == args['jam_selesai']:
+            return {'status': 'Jam mulai dan selesai tidak boleh sama'}, 400
+
+        try:
+            jam_mulai = time(0, 0) if args['jam_mulai'].strip() == '24:00' else datetime.strptime(args['jam_mulai'], "%H:%M").time()
+            jam_selesai = time(0, 0) if args['jam_selesai'].strip() == '24:00' else datetime.strptime(args['jam_selesai'], "%H:%M").time()
+        except ValueError:
+            return {'status': 'Format jam tidak valid. Gunakan format HH:MM'}, 400
+
+        # Hitung ulang bayaran lembur
+        result_hitung = hitung_bayaran_lembur(id_karyawan, tanggal, jam_mulai, jam_selesai)
+        if result_hitung is None:
+            return {'status': 'Gagal menghitung bayaran lembur'}, 500
+
+        data_update = {
+            "id_lembur": id_lembur,
+            "jam_mulai": jam_mulai,
+            "jam_selesai": jam_selesai,
+            "keterangan": args['keterangan'],
+            "menit_lembur": result_hitung['menit_lembur'],
+            "bayaran_perjam": result_hitung['bayaran_perjam'],
+            "total_bayaran": result_hitung['total_bayaran'],
+        }
+
+        update_result = update_lembur_by_id(data_update)
+        if not update_result:
+            return {'status': 'Gagal memperbarui data lembur'}, 500
+
+        return {'status': 'Pengajuan lembur berhasil diperbarui'}, 200
+    
     @jwt_required()
     def delete(self, id_lembur):
         """Akses: (admin/karyawan), Hapus (soft-delete) lembur"""
