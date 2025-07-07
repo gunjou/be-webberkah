@@ -95,6 +95,7 @@ class PengajuanLemburResource(Resource):
             'jam_selesai': jam_selesai,
             'keterangan': args['keterangan'],
             'path_lampiran': path_lampiran,
+            'menit_lembur': result_hitung['menit_lembur'],
             'bayaran_perjam': result_hitung['bayaran_perjam'],
             'total_bayaran': result_hitung['total_bayaran']
         }

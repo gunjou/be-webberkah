@@ -49,7 +49,7 @@ def get_rekap_absensi(start_date, end_date, libur_nasional):
                 LEFT JOIN statuspresensi sp ON a.id_status = sp.id_status
                 LEFT JOIN jeniskaryawan jk ON k.id_jenis = jk.id_jenis
                 LEFT JOIN tipekaryawan tk ON k.id_tipe = tk.id_tipe
-                WHERE a.tanggal BETWEEN :start_date AND :end_date
+                WHERE a.tanggal BETWEEN :start_date AND :end_date AND a.status = 1
                 GROUP BY 
                     k.id_karyawan, k.nama, k.gaji_pokok, 
                     k.id_jenis, jk.jenis, 
@@ -64,7 +64,7 @@ def get_rekap_absensi(start_date, end_date, libur_nasional):
                     a.id_karyawan,
                     a.tanggal
                 FROM absensi a
-                WHERE a.tanggal BETWEEN :start_date AND :end_date
+                WHERE a.tanggal BETWEEN :start_date AND :end_date AND a.status = 1
             """)
             result_lembur = connection.execute(lembur_query, {
                 'start_date': start_date,
@@ -111,7 +111,7 @@ def get_detail_absensi_by_karyawan(id_karyawan, start, end):
                 JOIN jeniskaryawan j ON j.id_jenis = k.id_jenis
                 JOIN tipekaryawan t ON t.id_tipe = k.id_tipe
                 WHERE a.id_karyawan = :id_karyawan
-                AND a.tanggal BETWEEN :start AND :end
+                AND a.tanggal BETWEEN :start AND :end AND a.status = 1
             """)
             absensi_result = connection.execute(query, {
                 'id_karyawan': id_karyawan,
@@ -139,7 +139,7 @@ def get_detail_absensi_by_karyawan(id_karyawan, start, end):
                 }
             # Ambil hari libur
             libur_result = connection.execute(text("""
-                SELECT tanggal FROM liburnasional WHERE tanggal BETWEEN :start AND :end
+                SELECT tanggal FROM liburnasional WHERE tanggal BETWEEN :start AND :end AND status = 1
             """), {'start': start, 'end': end}).fetchall()
             libur_set = {r.tanggal for r in libur_result}
 
@@ -149,7 +149,7 @@ def get_detail_absensi_by_karyawan(id_karyawan, start, end):
                 FROM karyawan k
                 JOIN jeniskaryawan j ON k.id_jenis = j.id_jenis
                 JOIN tipekaryawan t ON k.id_tipe = t.id_tipe
-                WHERE k.id_karyawan = :id_karyawan
+                WHERE k.id_karyawan = :id_karyawan AND k.status = 1
             """), {'id_karyawan': id_karyawan}).fetchone()
 
             if not karyawan_result:
@@ -228,7 +228,7 @@ def get_rekap_person(start_date, end_date, id_karyawan):
                 LEFT JOIN statuspresensi sp ON a.id_status = sp.id_status
                 LEFT JOIN jeniskaryawan jk ON k.id_jenis = jk.id_jenis
                 LEFT JOIN tipekaryawan tk ON k.id_tipe = tk.id_tipe
-                WHERE a.tanggal BETWEEN :start_date AND :end_date
+                WHERE a.tanggal BETWEEN :start_date AND :end_date AND a.status = 1
                 AND a.id_karyawan = :id_karyawan
                 GROUP BY 
                     k.id_karyawan, k.nama, k.gaji_pokok, 

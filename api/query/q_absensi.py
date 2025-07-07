@@ -25,10 +25,26 @@ def get_jenis_karyawan(id_karyawan):
         ).fetchone()
         return result[0] if result else None
     
-def add_checkin(id_karyawan, tanggal, jam_masuk, lokasi_absensi, jam_terlambat):
+def add_checkin(id_karyawan, tanggal, jam_masuk, lokasi_absensi, jam_terlambat_input):
     engine = get_connection()
     try:
-        with engine.begin() as connection:  # otomatis commit/rollback
+        with engine.begin() as connection:
+            # Cek apakah hari libur nasional
+            result_libur = connection.execute(
+                text("""
+                    SELECT 1 FROM liburnasional 
+                    WHERE tanggal = :tanggal AND status = 1
+                    LIMIT 1
+                """),
+                {'tanggal': tanggal}
+            ).scalar()
+
+            # Cek apakah hari minggu atau tanggal libur
+            is_libur = tanggal.weekday() == 6 or result_libur is not None
+
+            jam_terlambat = None if is_libur else jam_terlambat_input
+
+            # Masukkan absensi
             result = connection.execute(
                 text("""
                     INSERT INTO Absensi (
@@ -52,15 +68,31 @@ def add_checkin(id_karyawan, tanggal, jam_masuk, lokasi_absensi, jam_terlambat):
                     "timestamp_wita": get_wita()
                 }
             )
-            return result.scalar()  # ambil id_absensi yang dikembalikan
+            return result.scalar()
     except SQLAlchemyError as e:
         print(f"Error occurred: {str(e)}")
         return None
 
-def update_checkout(id_karyawan, tanggal, jam_keluar, lokasi_absensi, jam_kurang, total_jam_kerja):
+def update_checkout(id_karyawan, tanggal, jam_keluar, lokasi_absensi, jam_kurang_input, total_jam_kerja):
     engine = get_connection()
     try:
-        with engine.begin() as connection:  # ⬅️ commit & rollback otomatis
+        with engine.begin() as connection:
+            # Cek apakah hari libur nasional
+            result_libur = connection.execute(
+                text("""
+                    SELECT 1 FROM liburnasional 
+                    WHERE tanggal = :tanggal AND status = 1
+                    LIMIT 1
+                """),
+                {'tanggal': tanggal}
+            ).scalar()
+
+            # Cek apakah hari minggu atau tanggal libur
+            is_libur = tanggal.weekday() == 6 or result_libur is not None
+
+            jam_kurang = None if is_libur else jam_kurang_input
+
+            # Masukkan absensi
             result = connection.execute(
                 text("""
                     UPDATE Absensi 
@@ -88,10 +120,27 @@ def update_checkout(id_karyawan, tanggal, jam_keluar, lokasi_absensi, jam_kurang
         print(f"Error occurred: {str(e)}")
         return None
     
-def add_absensi(id_karyawan, tanggal, jam_masuk, jam_keluar, lokasi_masuk, lokasi_keluar, jam_terlambat, jam_kurang, total_jam_kerja):
+def add_absensi(id_karyawan, tanggal, jam_masuk, jam_keluar, lokasi_masuk, lokasi_keluar, jam_terlambat_input, jam_kurang_input, total_jam_kerja):
     engine = get_connection()
     try:
         with engine.begin() as connection:
+            # Cek apakah hari libur nasional
+            result_libur = connection.execute(
+                text("""
+                    SELECT 1 FROM liburnasional 
+                    WHERE tanggal = :tanggal AND status = 1
+                    LIMIT 1
+                """),
+                {'tanggal': tanggal}
+            ).scalar()
+
+            # Cek apakah hari minggu atau tanggal libur
+            is_libur = tanggal.weekday() == 6 or result_libur is not None
+
+            jam_terlambat = None if is_libur else jam_terlambat_input
+            jam_kurang = None if is_libur else jam_kurang_input
+
+            # Masukkan absensi
             connection.execute(
                 text("""
                     INSERT INTO Absensi (
@@ -175,17 +224,18 @@ def get_check_presensi(id_karyawan):
         print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
         return None  # Mengembalikan None jika terjadi kesalahan
     
+# query/absensi.py
 def get_history_absensi_harian(id_karyawan, tanggal):
     engine = get_connection()
     try:
         with engine.connect() as connection:
             query_result = connection.execute(
                 text("""
-                    SELECT a.id_karyawan, k.nama, s.id_status, s.nama_status, t.id_tipe, t.tipe, a.tanggal, a.jam_masuk, 
-                    a.jam_keluar, a.jam_terlambat, a.jam_kurang, a.total_jam_kerja, a.lokasi_masuk, a.lokasi_keluar, k.gaji_pokok
+                    SELECT a.id_karyawan, k.nama, s.id_status, t.id_tipe, t.tipe,
+                           a.jam_masuk, a.jam_keluar, a.lokasi_masuk, a.lokasi_keluar,
+                           a.jam_terlambat, a.jam_kurang AS jam_bolos, a.total_jam_kerja
                     FROM Absensi a 
                     INNER JOIN Karyawan k ON k.id_karyawan = a.id_karyawan 
-                    INNER JOIN Jeniskaryawan j ON k.id_jenis = j.id_jenis 
                     INNER JOIN StatusPresensi s ON a.id_status = s.id_status 
                     INNER JOIN TipeKaryawan t ON k.id_tipe = t.id_tipe 
                     WHERE a.id_karyawan = :id_karyawan AND a.status = 1 AND a.tanggal = :tanggal;
@@ -194,50 +244,22 @@ def get_history_absensi_harian(id_karyawan, tanggal):
             )
 
             data = [dict(row) for row in query_result.mappings()]
-
             result = []
-            JAM_ISTIRAHAT = 60
-            BATAS_MAKS_MENIT_PER_HARI = 480
 
             for row in data:
-                jam_terlambat = row['jam_terlambat'] or 0
-                jam_kurang_db = row['jam_kurang'] or 0
-                jam_kurang_total = jam_terlambat + jam_kurang_db
-                gaji_pokok = row['gaji_pokok']
-
-                tarif_per_menit = gaji_pokok / 12480
-                gaji_maks_harian = tarif_per_menit * BATAS_MAKS_MENIT_PER_HARI
-                potongan = tarif_per_menit * jam_kurang_total
-
-                total_jam_kerja = row['total_jam_kerja'] or 0
-                # waktu_kerja_efektif = max(0, total_jam_kerja - JAM_ISTIRAHAT)
-
-                if row['jam_keluar']:
-                    # total_gaji_harian = max(0, min(waktu_kerja_efektif, BATAS_MAKS_MENIT_PER_HARI) * tarif_per_menit - potongan)
-                    total_gaji_harian = max(0, gaji_maks_harian - potongan)
-                else:
-                    total_gaji_harian = 0
-
                 result.append({
                     'id_karyawan': row['id_karyawan'],
                     'nama': row['nama'],
-                    'status_presensi': row.get('nama_status'),
+                    'id_status': row['id_status'],
                     'id_tipe': row['id_tipe'],
                     'tipe': row['tipe'],
-                    'tanggal': row['tanggal'].strftime("%d-%m-%Y"),
                     'jam_masuk': row['jam_masuk'].strftime('%H:%M') if row['jam_masuk'] else None,
                     'jam_keluar': row['jam_keluar'].strftime('%H:%M') if row['jam_keluar'] else None,
-                    'jam_terlambat': jam_terlambat,
-                    'jam_bolos': jam_kurang_db,
-                    'jam_kurang': jam_kurang_total,
-                    'total_jam_kerja': total_jam_kerja,
                     'lokasi_masuk': row['lokasi_masuk'],
                     'lokasi_keluar': row['lokasi_keluar'],
-                    'gaji_pokok': round(gaji_pokok),
-                    'tarif_per_menit': round(tarif_per_menit),
-                    'gaji_maks_harian': round(gaji_maks_harian),
-                    'potongan': round(potongan),
-                    'total_gaji_harian': round(total_gaji_harian),
+                    'jam_terlambat': row['jam_terlambat'] or None,
+                    'jam_bolos': row['jam_bolos'] or None,
+                    'total_jam_kerja': row['total_jam_kerja'] or 0,
                 })
             return result
     except SQLAlchemyError as e:
@@ -357,13 +379,45 @@ def query_absensi_izin_sakit(tanggal, id_karyawan=None):
         print(f"Error occurred: {str(e)}")
         return []
 
-def update_absensi_by_id(id_absensi, jam_masuk, jam_keluar, jam_terlambat, jam_kurang, total_jam_kerja, lokasi_masuk, lokasi_keluar):
+def update_absensi_by_id(id_absensi, jam_masuk, jam_keluar, jam_terlambat_input, jam_kurang, total_jam_kerja, lokasi_masuk, lokasi_keluar):
     engine = get_connection()
     try:
         with engine.begin() as connection:
+            # Ambil tanggal dari absensi
+            absensi_data = connection.execute(
+                text("""
+                    SELECT tanggal FROM absensi
+                    WHERE id_absensi = :id_absensi AND status = 1
+                    LIMIT 1
+                """),
+                {'id_absensi': id_absensi}
+            ).mappings().fetchone()
+
+            if not absensi_data:
+                print(f"Tanggal tidak ditemukan untuk id_absensi {id_absensi}")
+                return None
+
+            tanggal = absensi_data['tanggal']
+
+            # Cek apakah hari libur nasional
+            result_libur = connection.execute(
+                text("""
+                    SELECT 1 FROM liburnasional 
+                    WHERE tanggal = :tanggal AND status = 1
+                    LIMIT 1
+                """),
+                {'tanggal': tanggal}
+            ).scalar()
+
+            # Cek apakah hari Minggu atau libur nasional
+            is_libur = tanggal.weekday() == 6 or result_libur is not None
+
+            # Jika hari libur, tidak dihitung jam terlambat
+            jam_terlambat = None if is_libur else jam_terlambat_input
+
             if jam_keluar:
                 query = text("""
-                    UPDATE Absensi
+                    UPDATE absensi
                     SET jam_masuk = :jam_masuk,
                         jam_keluar = :jam_keluar,
                         jam_terlambat = :jam_terlambat,
@@ -387,7 +441,7 @@ def update_absensi_by_id(id_absensi, jam_masuk, jam_keluar, jam_terlambat, jam_k
                 }
             else:
                 query = text("""
-                    UPDATE Absensi
+                    UPDATE absensi
                     SET jam_masuk = :jam_masuk,
                         jam_terlambat = :jam_terlambat,
                         jam_keluar = NULL,

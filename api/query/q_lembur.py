@@ -15,42 +15,23 @@ def hitung_bayaran_lembur(id_karyawan, tanggal, jam_mulai, jam_selesai):
             return None
         gaji_pokok = result.gaji_pokok
 
-        # Ambil semua libur nasional aktif di bulan yang sama
-        first_day = tanggal.replace(day=1)
-        next_month = (first_day.replace(day=28) + timedelta(days=4)).replace(day=1)
-        last_day = (next_month - timedelta(days=1)).day
-
-        start_date = first_day
-        end_date = tanggal.replace(day=last_day)
-
+        # Cek apakah tanggal adalah hari libur nasional
         libur_query = text("""
-            SELECT tanggal FROM liburnasional
-            WHERE status = 1 AND tanggal BETWEEN :start AND :end
+            SELECT 1 FROM liburnasional
+            WHERE status = 1 AND tanggal = :tanggal
+            LIMIT 1
         """)
-        libur_result = conn.execute(libur_query, {
-            "start": start_date,
-            "end": end_date
-        }).fetchall()
+        libur_result = conn.execute(libur_query, {"tanggal": tanggal}).scalar()
 
-        libur_dates = set([row.tanggal for row in libur_result])
+        is_minggu = tanggal.weekday() == 6
+        is_libur = is_minggu or libur_result is not None
 
-        # Hitung hari kerja reguler (tanpa Minggu dan hari libur nasional)
-        hari_reguler = sum(
-            1 for d in range(1, last_day + 1)
-            if (
-                datetime(tanggal.year, tanggal.month, d).weekday() != 6 and
-                datetime(tanggal.year, tanggal.month, d).date() not in libur_dates
-            )
-        )
-
-        if hari_reguler == 0:
-            return None  # Hindari pembagian nol
-
-        gaji_per_hari = gaji_pokok / hari_reguler
+        gaji_per_hari = gaji_pokok / 26
         gaji_per_jam = gaji_per_hari / 8
 
-        # Hitung bayaran per jam lembur (pakai pengali 2)
-        bayaran_perjam = round(gaji_per_jam * 2, 2)
+        # Perhitungan lembur
+        pengali = 2.0 if is_libur else 1.25
+        bayaran_perjam = round(gaji_per_jam * pengali, 2)
 
         # Hitung durasi kerja
         mulai_dt = datetime.combine(date.today(), jam_mulai)
@@ -59,13 +40,14 @@ def hitung_bayaran_lembur(id_karyawan, tanggal, jam_mulai, jam_selesai):
             selesai_dt += timedelta(days=1)
 
         durasi_jam = (selesai_dt - mulai_dt).total_seconds() / 3600
-        durasi_jam = min(durasi_jam, 8)  # Batasi maksimal 8 jam
+        menit_lembur = (selesai_dt - mulai_dt).total_seconds() / 60
 
         total_bayaran = round(durasi_jam * bayaran_perjam, 2)
 
         return {
             'bayaran_perjam': bayaran_perjam,
-            'total_bayaran': total_bayaran
+            'total_bayaran': total_bayaran,
+            'menit_lembur': menit_lembur,
         }
 
 def insert_pengajuan_lembur(data):
@@ -76,13 +58,13 @@ def insert_pengajuan_lembur(data):
                 INSERT INTO lembur (
                     id_karyawan, tanggal, jam_mulai, jam_selesai,
                     keterangan, path_lampiran,
-                    status_lembur, status,
+                    status_lembur, status, menit_lembur,
                     bayaran_perjam, total_bayaran,
                     created_at, updated_at
                 ) VALUES (
                     :id_karyawan, :tanggal, :jam_mulai, :jam_selesai,
                     :keterangan, :path_lampiran,
-                    'pending', 1,
+                    'pending', 1, :menit_lembur,
                     :bayaran_perjam, :total_bayaran,
                     :timestamp_wita, :timestamp_wita
                 )
@@ -94,6 +76,7 @@ def insert_pengajuan_lembur(data):
                 "jam_selesai": data['jam_selesai'],
                 "keterangan": data['keterangan'],
                 "path_lampiran": data['path_lampiran'],
+                "menit_lembur": data['menit_lembur'],
                 "bayaran_perjam": data['bayaran_perjam'],
                 "total_bayaran": data['total_bayaran'],
                 "timestamp_wita": get_wita()
