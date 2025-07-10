@@ -379,7 +379,7 @@ def query_absensi_izin_sakit(tanggal, id_karyawan=None):
         print(f"Error occurred: {str(e)}")
         return []
 
-def update_absensi_by_id(id_absensi, jam_masuk, jam_keluar, jam_terlambat_input, jam_kurang, total_jam_kerja, lokasi_masuk, lokasi_keluar):
+def update_absensi_by_id(id_absensi, jam_masuk, jam_keluar, jam_terlambat, jam_kurang, total_jam_kerja, lokasi_masuk, lokasi_keluar):
     engine = get_connection()
     try:
         with engine.begin() as connection:
@@ -413,7 +413,7 @@ def update_absensi_by_id(id_absensi, jam_masuk, jam_keluar, jam_terlambat_input,
             is_libur = tanggal.weekday() == 6 or result_libur is not None
 
             # Jika hari libur, tidak dihitung jam terlambat
-            jam_terlambat = None if is_libur else jam_terlambat_input
+            jam_terlambat = None if is_libur else jam_terlambat
 
             if jam_keluar:
                 query = text("""
