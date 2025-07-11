@@ -1,3 +1,4 @@
+from datetime import datetime
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from ..utils.config import get_connection, get_wita, get_timezone
@@ -120,7 +121,7 @@ def update_checkout(id_karyawan, tanggal, jam_keluar, lokasi_absensi, jam_kurang
         print(f"Error occurred: {str(e)}")
         return None
     
-def add_absensi(id_karyawan, tanggal, jam_masuk, jam_keluar, lokasi_masuk, lokasi_keluar, jam_terlambat_input, jam_kurang_input, total_jam_kerja):
+def add_absensi(id_karyawan, tanggal, jam_masuk, jam_keluar, lokasi_masuk, lokasi_keluar, jam_terlambat, jam_kurang, total_jam_kerja):
     engine = get_connection()
     try:
         with engine.begin() as connection:
@@ -135,10 +136,10 @@ def add_absensi(id_karyawan, tanggal, jam_masuk, jam_keluar, lokasi_masuk, lokas
             ).scalar()
 
             # Cek apakah hari minggu atau tanggal libur
-            is_libur = tanggal.weekday() == 6 or result_libur is not None
+            is_libur = datetime.strptime(tanggal, "%Y-%m-%d").weekday() == 6 or result_libur is not None
 
-            jam_terlambat = None if is_libur else jam_terlambat_input
-            jam_kurang = None if is_libur else jam_kurang_input
+            jam_terlambat = None if is_libur else jam_terlambat
+            jam_kurang = None if is_libur else jam_kurang
 
             # Masukkan absensi
             connection.execute(

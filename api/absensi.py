@@ -94,7 +94,7 @@ class AddAbsensiResource(Resource):
         if result == 0:
             return {'status': 'Data tidak ditemukan atau tidak berhasil ditambahkan'}, 404
 
-        return {'status': 'Data absensi berhasil ditambahkan'}, 200
+        return {'status': 'Data absensi berhasil ditambahkan'}, 201
 
 
 @absensi_ns.route('/check-in/<int:id_karyawan>')
