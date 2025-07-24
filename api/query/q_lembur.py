@@ -9,11 +9,12 @@ def hitung_bayaran_lembur(id_karyawan, tanggal, jam_mulai, jam_selesai):
     engine = get_connection()
     with engine.connect() as conn:
         # Ambil gaji pokok
-        q = text("SELECT gaji_pokok FROM karyawan WHERE id_karyawan = :id_karyawan")
+        q = text("SELECT gaji_pokok, id_jenis FROM karyawan WHERE id_karyawan = :id_karyawan AND status = 1")
         result = conn.execute(q, {"id_karyawan": id_karyawan}).fetchone()
         if not result or result.gaji_pokok is None:
             return None
         gaji_pokok = result.gaji_pokok
+        id_jenis = result.id_jenis
 
         # Cek apakah tanggal adalah hari libur nasional
         libur_query = text("""
@@ -29,8 +30,12 @@ def hitung_bayaran_lembur(id_karyawan, tanggal, jam_mulai, jam_selesai):
         gaji_per_hari = gaji_pokok / 26
         gaji_per_jam = gaji_per_hari / 8
 
-        # Perhitungan lembur
-        pengali = 2.0 if is_libur else 1.25
+        # Tentukan pengali berdasarkan jenis karyawan dan hari
+        if id_jenis == 6:  # K3 Lapangan
+            pengali = 2.0 if is_libur else 1.0
+        else:  # Selain K3 Lapangan
+            pengali = 2.0 if is_libur else 1.25
+
         bayaran_perjam = round(gaji_per_jam * pengali, 2)
 
         # Hitung durasi kerja
