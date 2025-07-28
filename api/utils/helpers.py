@@ -1,6 +1,31 @@
 from datetime import datetime, time, date, timedelta
 from decimal import Decimal
+from PIL import Image, UnidentifiedImageError
 import pytz
+
+def compress_image(file, save_path, max_width=1280, quality=80):
+    """Resize dan kompres gambar"""
+    img = Image.open(file)
+    img = img.convert('RGB')
+    
+    # Resize jika terlalu besar
+    if img.width > max_width:
+        ratio = max_width / float(img.width)
+        height = int((float(img.height) * float(ratio)))
+        img = img.resize((max_width, height), Image.ANTIALIAS)
+
+    # Simpan ke file
+    img.save(save_path, optimize=True, quality=quality)
+
+def is_image(file):
+    """Cek apakah file adalah gambar"""
+    try:
+        Image.open(file).verify()
+        file.seek(0)  # reset pointer karena verify() menggeser
+        return True
+    except (UnidentifiedImageError, IOError):
+        file.seek(0)
+        return False
 
 def hitung_waktu_kerja(jam_masuk, jam_keluar):
     if jam_keluar is None:

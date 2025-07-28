@@ -7,7 +7,7 @@ from werkzeug.utils import secure_filename
 from werkzeug.datastructures import FileStorage
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
-from .utils.helpers import hitung_jam_kurang, hitung_keterlambatan, hitung_waktu_kerja
+from .utils.helpers import compress_image, hitung_jam_kurang, hitung_keterlambatan, hitung_waktu_kerja, is_image
 from .utils.decorator import role_required
 from .query.q_izin_sakit import *
 
@@ -35,8 +35,9 @@ setengah_hari_parser.add_argument('jam_selesai', type=str, required=True, help='
 upload_parser = izin_ns.parser()
 upload_parser.add_argument('file', location='files', type='file', required=True)
 
-# Daftar ekstensi file yang diizinkan
+# Daftar ekstensi file yang diizinkan Batas maksimal file yang diizinkan adalah 2MB
 ALLOWED_EXTENSIONS = {'pdf', 'jpg', 'jpeg', 'png'}
+MAX_FILE_SIZE = 2 * 1024 * 1024  # 2MB
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -179,10 +180,22 @@ class UploadLampiran(Resource):
         upload_dir = os.path.join(current_app.root_path, '..', 'uploads', 'izin', today_str)
         os.makedirs(upload_dir, exist_ok=True)
 
+        # Validasi ukuran file
+        file.seek(0, os.SEEK_END)
+        file_length = file.tell()
+        file.seek(0)
+
         # Simpan file secara aman
         filename = secure_filename(file.filename)
         save_path = os.path.join(upload_dir, filename)
-        file.save(save_path)
+
+        if file_length > MAX_FILE_SIZE:
+            if is_image(file):
+                compress_image(file, save_path)
+            else:
+                return {'status': 'error', 'message': 'File terlalu besar dan bukan gambar'}, 400
+        else:
+            file.save(save_path)
 
         relative_path = os.path.join('uploads', 'izin', today_str, filename)
 
