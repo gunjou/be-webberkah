@@ -61,24 +61,24 @@ def get_rekap_absensi(start_date, end_date, libur_nasional):
             # Ambil data absensi hari Minggu dan libur nasional untuk hitung lembur
             lembur_query = text("""
                 SELECT 
-                    a.id_karyawan,
-                    a.tanggal
-                FROM absensi a
-                WHERE a.tanggal BETWEEN :start_date AND :end_date AND a.status = 1
+                    id_karyawan, tanggal
+                FROM lembur
+                WHERE tanggal BETWEEN :start_date AND :end_date
+                    AND status = 1
+                    AND status_lembur = 'approved'
             """)
             result_lembur = connection.execute(lembur_query, {
                 'start_date': start_date,
                 'end_date': end_date
             }).mappings()
 
+            # Hitung jumlah lembur untuk setiap karyawan tanpa memfilter hari libur
             lembur_map = {}
             for row in result_lembur:
-                tanggal = row['tanggal']
-                if tanggal.weekday() == 6 or tanggal in libur_nasional:
-                    id_karyawan = row['id_karyawan']
-                    lembur_map[id_karyawan] = lembur_map.get(id_karyawan, 0) + 1
+                id_karyawan = row['id_karyawan']
+                lembur_map[id_karyawan] = lembur_map.get(id_karyawan, 0) + 1
 
-            # Gabungkan hasil
+            # Gabungkan hasil ke data akhir
             final_result = []
             for row in result.mappings():
                 id_karyawan = row['id_karyawan']
