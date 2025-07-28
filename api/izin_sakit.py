@@ -99,39 +99,55 @@ class PengajuanIzinResource(Resource):
         args = izin_parser.parse_args()
         file = args['file']
 
-        # Validasi lampiran jika jenis = 4 (sakit)
-        if args['id_jenis'] == 4 and file is None:
-            return {'status': 'Lampiran wajib untuk permohonan sakit'}, 400
+        try:
+            # Validasi lampiran jika jenis = 4 (sakit)
+            if args['id_jenis'] == 4 and file is None:
+                return {'status': 'Lampiran wajib untuk permohonan sakit'}, 400
 
-        path_lampiran = None
-        if file and allowed_file(file.filename):
-            today_str = datetime.now().strftime('%Y-%m')
-            upload_dir = os.path.join(current_app.root_path, '..', 'uploads', 'izin', today_str)
-            os.makedirs(upload_dir, exist_ok=True)
+            path_lampiran = None
+            if file and allowed_file(file.filename):
+                today_str = datetime.now().strftime('%Y-%m')
+                upload_dir = os.path.join(current_app.root_path, '..', 'uploads', 'izin', today_str)
+                os.makedirs(upload_dir, exist_ok=True)
 
-            filename = secure_filename(file.filename)
-            save_path = os.path.join(upload_dir, filename)
-            file.save(save_path)
+                # Validasi ukuran file
+                file.seek(0, os.SEEK_END)
+                file_length = file.tell()
+                file.seek(0)
 
-            path_lampiran = os.path.join('uploads', 'izin', today_str, filename)
-        elif file:
-            return {'status': 'Ekstensi file tidak diizinkan'}, 400
+                filename = secure_filename(file.filename)
+                save_path = os.path.join(upload_dir, filename)
+                # file.save(save_path)
 
-        # Susun data yang dikirim ke fungsi query
-        data = {
-            'id_karyawan': get_jwt_identity(),
-            'id_jenis': args['id_jenis'],
-            'keterangan': args['keterangan'],
-            'tgl_mulai': datetime.strptime(args['tgl_mulai'], "%d-%m-%Y").date(),
-            'tgl_selesai': datetime.strptime(args['tgl_selesai'], "%d-%m-%Y").date(),
-            'path_lampiran': path_lampiran
-        }
+                if file_length > MAX_FILE_SIZE:
+                    if is_image(file):
+                        compress_image(file, save_path)
+                    else:
+                        return {'status': 'error', 'message': 'File terlalu besar dan bukan gambar'}, 400
+                else:
+                    file.save(save_path)
 
-        result = insert_pengajuan_izin(data)
-        if result is None:
-            return {'status': 'Gagal mengajukan izin'}, 500
+                path_lampiran = os.path.join('uploads', 'izin', today_str, filename)
+            elif file:
+                return {'status': 'Ekstensi file tidak diizinkan'}, 400
 
-        return {'status': 'Pengajuan izin berhasil direkam'}, 201
+            # Susun data yang dikirim ke fungsi query
+            data = {
+                'id_karyawan': get_jwt_identity(),
+                'id_jenis': args['id_jenis'],
+                'keterangan': args['keterangan'],
+                'tgl_mulai': datetime.strptime(args['tgl_mulai'], "%d-%m-%Y").date(),
+                'tgl_selesai': datetime.strptime(args['tgl_selesai'], "%d-%m-%Y").date(),
+                'path_lampiran': path_lampiran
+            }
+
+            result = insert_pengajuan_izin(data)
+            if result is None:
+                return {'status': 'Gagal mengajukan izin'}, 500
+
+            return {'status': 'Pengajuan izin berhasil direkam'}, 201
+        except Exception as e:
+            return {'status': 'Error', 'message': str(e)}, 400
     
 
 @izin_ns.route('/by-karyawan')

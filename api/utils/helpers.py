@@ -3,18 +3,9 @@ from decimal import Decimal
 from PIL import Image, UnidentifiedImageError
 import pytz
 
-def compress_image(file, save_path, max_width=1280, quality=80):
-    """Resize dan kompres gambar"""
+def compress_image(file, save_path, max_size=(1280, 1280), quality=85):
     img = Image.open(file)
-    img = img.convert('RGB')
-    
-    # Resize jika terlalu besar
-    if img.width > max_width:
-        ratio = max_width / float(img.width)
-        height = int((float(img.height) * float(ratio)))
-        img = img.resize((max_width, height), Image.ANTIALIAS)
-
-    # Simpan ke file
+    img.thumbnail(max_size)  # Resize keeping aspect ratio
     img.save(save_path, optimize=True, quality=quality)
 
 def is_image(file):
