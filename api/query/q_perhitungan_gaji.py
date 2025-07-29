@@ -11,7 +11,7 @@ def get_libur_nasional(start_date: date, end_date: date):
         with engine.connect() as connection:
             query = text("""
                 SELECT tanggal FROM liburnasional
-                WHERE tanggal BETWEEN :start_date AND :end_date
+                WHERE status = 1 AND tanggal BETWEEN :start_date AND :end_date
             """)
             result = connection.execute(query, {'start_date': start_date, 'end_date': end_date}).mappings()
             return set(row['tanggal'] for row in result)
