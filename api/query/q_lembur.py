@@ -44,16 +44,20 @@ def hitung_bayaran_lembur(id_karyawan, tanggal, jam_mulai, jam_selesai):
         if jam_selesai <= jam_mulai:
             selesai_dt += timedelta(days=1)
 
-        durasi = selesai_dt - mulai_dt
+        total_durasi = (selesai_dt - mulai_dt).total_seconds() / 3600  # dalam jam
 
-        # Kurangi 1 jam istirahat jika jam kerja antara 08:00 sampai 17:00
-        if time(7, 0) < jam_mulai < time(17, 0) and time(7, 0) < jam_selesai <= time(17, 0):
-            durasi -= timedelta(hours=1)
+        # Penyesuaian jam istirahat (potong 1 jam jika dalam rentang pagi dan hari libur)
+        if is_libur and jam_mulai >= time(7, 0) and jam_selesai <= time(17, 0):
+            total_durasi -= 1
 
-        durasi_jam = durasi.total_seconds() / 3600
-        menit_lembur = durasi.total_seconds() / 60
+            # Batas maksimal 8 jam lembur
+            if total_durasi > 8:
+                total_durasi = 8
 
-        total_bayaran = round(durasi_jam * bayaran_perjam, 2)
+        # Jika di luar waktu tersebut, tidak dipotong istirahat atau tidak dibatasi
+        total_durasi = max(total_durasi, 0)
+        total_bayaran = round(total_durasi * bayaran_perjam, 2)
+        menit_lembur = round(total_durasi * 60)
 
         return {
             'bayaran_perjam': bayaran_perjam,
