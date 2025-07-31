@@ -54,15 +54,10 @@ def hitung_bayaran_lembur(id_karyawan, tanggal, jam_mulai, jam_selesai):
             if total_durasi > 8:
                 total_durasi = 8
 
-            total_durasi = max(total_durasi, 0)
-            total_bayaran = round(total_durasi * bayaran_perjam)
-            menit_lembur = round(total_durasi * 60)
-            
         # Jika di luar waktu tersebut, tidak dipotong istirahat atau tidak dibatasi
-        else:
-            total_durasi = max(total_durasi, 0)
-            total_bayaran = round(total_durasi * bayaran_perjam)
-            menit_lembur = round(total_durasi * 60)
+        total_durasi = max(total_durasi, 0)
+        total_bayaran = round(total_durasi * bayaran_perjam)
+        menit_lembur = round(total_durasi * 60)
 
         return {
             'bayaran_perjam': bayaran_perjam,
