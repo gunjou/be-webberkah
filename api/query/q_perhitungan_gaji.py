@@ -86,7 +86,7 @@ def get_rekap_gaji(start_date: date = None, end_date: date = None, tanggal: date
                 LEFT JOIN statuspresensi sp ON a.id_status = sp.id_status
                 LEFT JOIN jeniskaryawan jk ON k.id_jenis = jk.id_jenis
                 LEFT JOIN tipekaryawan tk ON k.id_tipe = tk.id_tipe
-                WHERE a.tanggal BETWEEN :start_date AND :end_date AND a.status = 1
+                WHERE a.tanggal BETWEEN :start_date AND :end_date AND a.status = 1 AND k.status = 1
             """
             params = {'start_date': start_date, 'end_date': end_date}
 
@@ -149,14 +149,14 @@ def get_rekap_gaji(start_date: date = None, end_date: date = None, tanggal: date
                     gaji_perhari = gaji_pokok
                     jumlah_hari_dibayar = hadir  # hanya hadir yang dihitung
 
-                gaji_kotor = round(gaji_perhari * jumlah_hari_dibayar, 2)
+                gaji_kotor = round(gaji_perhari * jumlah_hari_dibayar)
 
                 gaji_perjam = gaji_perhari / 8
                 gaji_permenit = gaji_perjam / 60
 
                 terlambat = row['total_jam_terlambat'] or 0
                 jam_kurang = row['total_jam_kurang'] or 0
-                total_potongan = round(gaji_permenit * (terlambat + jam_kurang), 2)
+                total_potongan = round(gaji_permenit * (terlambat + jam_kurang))
 
                 lembur_data = lembur_map.get(id_karyawan, {})
                 total_lembur = lembur_data.get('total_lembur') or 0
@@ -169,8 +169,8 @@ def get_rekap_gaji(start_date: date = None, end_date: date = None, tanggal: date
 
                 gaji_bersih = None
                 if total_jam_kerja > 0:
-                    gaji_bersih_tanpa_lembur = round(gaji_kotor - total_potongan + tunjangan_kehadiran, 2)
-                    gaji_bersih = round(gaji_kotor - total_potongan + total_bayaran_lembur + tunjangan_kehadiran, 2)
+                    gaji_bersih_tanpa_lembur = round(gaji_kotor - total_potongan + tunjangan_kehadiran)
+                    gaji_bersih = round(gaji_kotor - total_potongan + total_bayaran_lembur + tunjangan_kehadiran)
 
                 result.append({
                     'id_karyawan': id_karyawan,
@@ -187,14 +187,14 @@ def get_rekap_gaji(start_date: date = None, end_date: date = None, tanggal: date
                     'jam_normal': hari_optimal * 480,
                     'jam_terlambat': terlambat,
                     'jam_kurang': jam_kurang,
-                    'gaji_pokok': round(gaji_pokok, 2),
+                    'gaji_pokok': round(gaji_pokok),
                     'potongan': total_potongan,
                     'tunjangan_kehadiran': tunjangan_kehadiran,
                     'total_lembur': total_lembur,
                     'total_menit_lembur': total_menit_lembur,
                     'gaji_kotor': gaji_kotor,
                     'gaji_bersih_tanpa_lembur': gaji_bersih_tanpa_lembur,
-                    'total_bayaran_lembur': round(total_bayaran_lembur, 2),
+                    'total_bayaran_lembur': round(total_bayaran_lembur),
                     'gaji_bersih': gaji_bersih
                 })
             return result
