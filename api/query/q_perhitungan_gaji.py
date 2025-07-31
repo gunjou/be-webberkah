@@ -136,20 +136,24 @@ def get_rekap_gaji(start_date: date = None, end_date: date = None, tanggal: date
                 gaji_pokok = row['gaji_pokok']
                 tipe_id = row['id_tipe']
 
-                gaji_perhari = gaji_pokok / hari_optimal if hari_optimal else 0
-                gaji_perjam = gaji_perhari / 8
-                gaji_permenit = gaji_perjam / 60
-
                 hadir = row['jumlah_hadir'] or 0
                 izin = row['jumlah_izin'] or 0
                 sakit = row['jumlah_sakit'] or 0
 
                 if tipe_id == 1:  # Pegawai Tetap
+                    # Tetap: gaji pokok dibagi hari optimal
+                    gaji_perhari = gaji_pokok / hari_optimal if hari_optimal else 0
                     jumlah_hari_dibayar = min(hadir + izin + sakit, hari_optimal)
-                else:
-                    jumlah_hari_dibayar = min(hadir, hari_optimal)
+                else:  # Pegawai Tidak Tetap
+                    # Tidak tetap: gaji pokok = gaji per hari langsung dari DB
+                    gaji_perhari = gaji_pokok
+                    jumlah_hari_dibayar = hadir  # hanya hadir yang dihitung
 
-                total_upah = round(gaji_perhari * jumlah_hari_dibayar, 2)
+                gaji_kotor = round(gaji_perhari * jumlah_hari_dibayar, 2)
+
+                gaji_perjam = gaji_perhari / 8
+                gaji_permenit = gaji_perjam / 60
+
                 terlambat = row['total_jam_terlambat'] or 0
                 jam_kurang = row['total_jam_kurang'] or 0
                 total_potongan = round(gaji_permenit * (terlambat + jam_kurang), 2)
@@ -165,7 +169,8 @@ def get_rekap_gaji(start_date: date = None, end_date: date = None, tanggal: date
 
                 gaji_bersih = None
                 if total_jam_kerja > 0:
-                    gaji_bersih = round(total_upah - total_potongan + total_bayaran_lembur + tunjangan_kehadiran, 2)
+                    gaji_bersih_tanpa_lembur = round(gaji_kotor - total_potongan + tunjangan_kehadiran, 2)
+                    gaji_bersih = round(gaji_kotor - total_potongan + total_bayaran_lembur + tunjangan_kehadiran, 2)
 
                 result.append({
                     'id_karyawan': id_karyawan,
@@ -187,6 +192,8 @@ def get_rekap_gaji(start_date: date = None, end_date: date = None, tanggal: date
                     'tunjangan_kehadiran': tunjangan_kehadiran,
                     'total_lembur': total_lembur,
                     'total_menit_lembur': total_menit_lembur,
+                    'gaji_kotor': gaji_kotor,
+                    'gaji_bersih_tanpa_lembur': gaji_bersih_tanpa_lembur,
                     'total_bayaran_lembur': round(total_bayaran_lembur, 2),
                     'gaji_bersih': gaji_bersih
                 })
