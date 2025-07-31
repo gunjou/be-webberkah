@@ -109,7 +109,7 @@ def get_daftar_lembur(status_lembur=None, id_karyawan=None, start_date=None, end
                 SELECT l.id_lembur, l.id_karyawan, k.nama AS nama_karyawan,
                        l.tanggal, l.jam_mulai, l.jam_selesai,
                        l.keterangan, l.path_lampiran, l.status_lembur,
-                       l.alasan_penolakan, l.bayaran_perjam, l.total_bayaran,
+                       l.alasan_penolakan, l.bayaran_perjam, l.total_bayaran, l.menit_lembur,
                        l.created_at, l.updated_at
                 FROM lembur l
                 JOIN karyawan k ON l.id_karyawan = k.id_karyawan
@@ -143,18 +143,18 @@ def get_daftar_lembur(status_lembur=None, id_karyawan=None, start_date=None, end
                     for key, value in row.items()
                 }
 
-                # Hitung jam lembur
-                jam_mulai = row['jam_mulai']
-                jam_selesai = row['jam_selesai']
-                if isinstance(jam_mulai, time) and isinstance(jam_selesai, time):
-                    mulai_dt = datetime.combine(date.today(), jam_mulai)
-                    selesai_dt = datetime.combine(date.today(), jam_selesai)
-                    if jam_selesai <= jam_mulai:
-                        selesai_dt += timedelta(days=1)
-                    durasi = selesai_dt - mulai_dt
-                    row_dict['jam_lembur'] = round(durasi.total_seconds() / 3600, 2)
-                else:
-                    row_dict['jam_lembur'] = None
+                # # Hitung jam lembur
+                # jam_mulai = row['jam_mulai']
+                # jam_selesai = row['jam_selesai']
+                # if isinstance(jam_mulai, time) and isinstance(jam_selesai, time):
+                #     mulai_dt = datetime.combine(date.today(), jam_mulai)
+                #     selesai_dt = datetime.combine(date.today(), jam_selesai)
+                #     if jam_selesai <= jam_mulai:
+                #         selesai_dt += timedelta(days=1)
+                #     durasi = selesai_dt - mulai_dt
+                #     row_dict['jam_lembur'] = round(durasi.total_seconds() / 3600, 2)
+                # else:
+                #     row_dict['jam_lembur'] = None
 
                 data.append(row_dict)
 
