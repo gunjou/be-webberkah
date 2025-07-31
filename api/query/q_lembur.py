@@ -8,15 +8,21 @@ from ..utils.config import get_connection, get_wita
 def hitung_bayaran_lembur(id_karyawan, tanggal, jam_mulai, jam_selesai):
     engine = get_connection()
     with engine.connect() as conn:
-        # Ambil gaji pokok
-        q = text("SELECT gaji_pokok, id_jenis FROM karyawan WHERE id_karyawan = :id_karyawan AND status = 1")
+        # Ambil gaji pokok, tipe, dan jenis karyawan
+        q = text("""
+            SELECT gaji_pokok, id_jenis, id_tipe 
+            FROM karyawan 
+            WHERE id_karyawan = :id_karyawan AND status = 1
+        """)
         result = conn.execute(q, {"id_karyawan": id_karyawan}).fetchone()
         if not result or result.gaji_pokok is None:
             return None
+
         gaji_pokok = result.gaji_pokok
         id_jenis = result.id_jenis
+        id_tipe = result.id_tipe
 
-        # Cek apakah tanggal adalah hari libur nasional
+        # Cek hari libur nasional
         libur_query = text("""
             SELECT 1 FROM liburnasional
             WHERE status = 1 AND tanggal = :tanggal
@@ -27,34 +33,38 @@ def hitung_bayaran_lembur(id_karyawan, tanggal, jam_mulai, jam_selesai):
         is_minggu = tanggal.weekday() == 6
         is_libur = is_minggu or libur_result is not None
 
-        gaji_per_hari = gaji_pokok / 26
+        # Gaji per hari langsung jika pegawai tidak tetap
+        if id_tipe == 2:
+            gaji_per_hari = gaji_pokok
+        else:
+            gaji_per_hari = gaji_pokok / 26
+
         gaji_per_jam = gaji_per_hari / 8
 
-        # Tentukan pengali berdasarkan jenis karyawan dan hari
+        # Tentukan pengali lembur
         if id_jenis == 6:  # K3 Lapangan
             pengali = 2.0 if is_libur else 1.0
-        else:  # Selain K3 Lapangan
+        else:
             pengali = 2.0 if is_libur else 1.25
 
         bayaran_perjam = round(gaji_per_jam * pengali)
 
-        # Hitung durasi kerja
-        mulai_dt = datetime.combine(date.today(), jam_mulai)
-        selesai_dt = datetime.combine(date.today(), jam_selesai)
+        # Hitung durasi jam kerja
+        mulai_dt = datetime.combine(tanggal, jam_mulai)
+        selesai_dt = datetime.combine(tanggal, jam_selesai)
         if jam_selesai <= jam_mulai:
             selesai_dt += timedelta(days=1)
 
         total_durasi = (selesai_dt - mulai_dt).total_seconds() / 3600  # dalam jam
 
-        # Penyesuaian jam istirahat (potong 1 jam jika dalam rentang pagi dan hari libur)
-        if is_libur and jam_mulai >= time(7, 0) and jam_selesai <= time(17, 0):
+        # Potongan istirahat HANYA untuk hari libur (minggu/nasional)
+        if is_libur and jam_mulai <= time(12, 0) and jam_selesai >= time(13, 0):
             total_durasi -= 1
 
-            # Batas maksimal 8 jam lembur
-            if total_durasi > 8:
-                total_durasi = 8
+        # Batasi maksimal 8 jam HANYA untuk hari libur
+        if is_libur and total_durasi > 8:
+            total_durasi = 8
 
-        # Jika di luar waktu tersebut, tidak dipotong istirahat atau tidak dibatasi
         total_durasi = max(total_durasi, 0)
         total_bayaran = round(total_durasi * bayaran_perjam)
         menit_lembur = round(total_durasi * 60)
