@@ -43,7 +43,7 @@ def hitung_bayaran_lembur(id_karyawan, tanggal, jam_mulai, jam_selesai):
 
         # Tentukan pengali lembur
         if id_jenis == 6:  # K3 Lapangan
-            pengali = 2.0 if is_libur else 1.0
+            pengali = 1.0 if is_libur else 1.0
         else:
             pengali = 2.0 if is_libur else 1.25
 
