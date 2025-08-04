@@ -1,5 +1,5 @@
 from flask_restx import Namespace, Resource, reqparse
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import get_jwt, jwt_required, get_jwt_identity
 from datetime import datetime, date, timedelta
 import calendar
 from .utils.decorator import role_required
@@ -14,7 +14,7 @@ rekap_absensi_parser.add_argument('start', type=str, required=False, help='Tangg
 rekap_absensi_parser.add_argument('end', type=str, required=False, help='Tanggal akhir (DD-MM-YYYY)')
 
 detail_absensi_parser = reqparse.RequestParser()
-detail_absensi_parser.add_argument('id_karyawan', type=int, required=True, help='ID karyawan')
+detail_absensi_parser.add_argument('id_karyawan', type=int, required=False, help='ID karyawan')
 detail_absensi_parser.add_argument('start_date', type=str, required=False, help='Tanggal awal (DD-MM-YYYY)')
 detail_absensi_parser.add_argument('end_date', type=str, required=False, help='Tanggal akhir (DD-MM-YYYY)')
 
@@ -74,18 +74,25 @@ class RekapAbsensi(Resource):
 @rekapan_ns.route('/absensi/detail')
 class DetailAbsensi(Resource):
     @rekapan_ns.expect(detail_absensi_parser)
-    @role_required('admin')
+    @jwt_required()
     def get(self):
-        """Akses: (admin), Mengambil list detail absensi dari karyawan berdasarkan periode"""
+        """Akses: (admin & karyawan), Mengambil list detail absensi dari karyawan berdasarkan periode"""
         args = detail_absensi_parser.parse_args()
-        id_karyawan = args.get('id_karyawan')
+        jwt_data = get_jwt()
+        current_user_id = get_jwt_identity()
+        role = jwt_data.get("role")
+
         start_param = args.get('start_date')
         end_param = args.get('end_date')
 
-        if not id_karyawan:
-            rekapan_ns.abort(400, 'Parameter id_karyawan wajib diisi')
-
-        today = datetime.today().date()
+        if role == "admin":
+            id_karyawan = args.get('id_karyawan')
+            if not id_karyawan:
+                rekapan_ns.abort(400, 'Parameter id_karyawan wajib diisi untuk admin')
+        elif role == "karyawan":
+            id_karyawan = current_user_id
+        else:
+            rekapan_ns.abort(403, "Role tidak diizinkan")
 
         try:
             if start_param and end_param:

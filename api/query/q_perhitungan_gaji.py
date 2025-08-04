@@ -72,7 +72,7 @@ def get_rekap_gaji(start_date: date = None, end_date: date = None, tanggal: date
 
             query = """
                 SELECT 
-                    k.id_karyawan, k.nama, k.gaji_pokok, 
+                    k.id_karyawan, k.nip, k.nama, k.gaji_pokok, k.bank, k.no_rekening,
                     jk.id_jenis, jk.jenis, 
                     tk.id_tipe, tk.tipe,
                     SUM(a.jam_terlambat) AS total_jam_terlambat,
@@ -166,6 +166,7 @@ def get_rekap_gaji(start_date: date = None, end_date: date = None, tanggal: date
                 tunjangan_kehadiran = (tunjangan_map.get(id_karyawan) or 0) * 10000
 
                 total_jam_kerja = row['total_jam_kerja'] or 0
+                total_jam_kerja -= 60 * hadir
 
                 gaji_bersih = None
                 if total_jam_kerja > 0:
@@ -174,9 +175,12 @@ def get_rekap_gaji(start_date: date = None, end_date: date = None, tanggal: date
 
                 result.append({
                     'id_karyawan': id_karyawan,
+                    'nip': row['nip'],
                     'nama': row['nama'],
                     'id_tipe': tipe_id,
                     'tipe': row['tipe'],
+                    'bank': row['bank'],
+                    'no_rekening': row['no_rekening'],
                     'periode_awal': start_date.strftime('%d %b %Y'),
                     'periode_akhir': end_date.strftime('%d %b %Y'),
                     'jumlah_hadir': hadir,
@@ -229,6 +233,8 @@ def get_gaji_harian(tanggal: date, id_karyawan: int):
             jam_terlambat = result['jam_terlambat'] or 0
             jam_kurang = result['jam_kurang'] or 0
             total_jam_kerja = result['total_jam_kerja'] or 0
+            if total_jam_kerja >= 300:
+                total_jam_kerja -= 60
             id_tipe = result['id_tipe']
 
             # Hitung gaji harian berdasarkan tipe pegawai

@@ -248,6 +248,10 @@ def get_history_absensi_harian(id_karyawan, tanggal):
             result = []
 
             for row in data:
+                total_jam_kerja = row['total_jam_kerja'] or 0
+                if total_jam_kerja >= 300:
+                    total_jam_kerja -= 60
+                    
                 result.append({
                     'id_karyawan': row['id_karyawan'],
                     'nama': row['nama'],
@@ -260,7 +264,7 @@ def get_history_absensi_harian(id_karyawan, tanggal):
                     'lokasi_keluar': row['lokasi_keluar'],
                     'jam_terlambat': row['jam_terlambat'] or None,
                     'jam_bolos': row['jam_bolos'] or None,
-                    'total_jam_kerja': row['total_jam_kerja'] or 0,
+                    'total_jam_kerja': total_jam_kerja,
                 })
             return result
     except SQLAlchemyError as e:
@@ -322,7 +326,7 @@ def query_absensi_tidak_hadir(tanggal):
                     FROM Karyawan k
                     JOIN JenisKaryawan j ON k.id_jenis = j.id_jenis
                     LEFT JOIN Absensi a ON k.id_karyawan = a.id_karyawan AND a.tanggal = :tanggal
-                    WHERE k.status = 1 AND a.id_absensi IS NULL
+                    WHERE k.status = 1 AND a.id_absensi IS NULL AND j.status = 1
                 """),
                 {"tanggal": tanggal}
             )

@@ -9,6 +9,7 @@ from .query.q_pegawai import *
 pegawai_ns = Namespace("pegawai", description="Pegawai related endpoints")
 
 pegawai_model = pegawai_ns.model("Pegawai", {
+    "nip": fields.String(required=False, description="Nomor Induk Pegawai"),
     "id_jenis": fields.Integer(required=True, description="id jenis pegawai"),
     "id_tipe": fields.Integer(required=True, description="id tipe pegawai"),
     "nama": fields.String(required=True, description="nama pegawai"),
@@ -16,6 +17,20 @@ pegawai_model = pegawai_ns.model("Pegawai", {
     "username": fields.String(required=True, description="username pegawai"),
     "password": fields.String(required=False, description="password pegawai"),
     "kode_pemulihan": fields.String(required=False, description="kode pemulihan pegawai"),
+    "bank": fields.String(required=False, description="Nama bank"),
+    "no_rekening": fields.String(required=False, description="Nomor rekening"),
+})
+
+edit_pegawai_model = pegawai_ns.model("EditPegawai", {
+    "id_jenis": fields.Integer(required=True, description="id jenis pegawai"),
+    "id_tipe": fields.Integer(required=True, description="id tipe pegawai"),
+    "nama": fields.String(required=True, description="nama pegawai"),
+    "gaji_pokok": fields.Integer(required=True, description="gaji pokok pegawai"),
+    "username": fields.String(required=True, description="username pegawai"),
+    "password": fields.String(required=False, description="password pegawai"),
+    "kode_pemulihan": fields.String(required=False, description="kode pemulihan pegawai"),
+    "bank": fields.String(required=False, description="Nama bank"),
+    "no_rekening": fields.String(required=False, description="Nomor rekening"),
 })
 
 password_model = pegawai_ns.model("GantiPasswordPegawai", {
@@ -52,6 +67,19 @@ class PegawaiListResource(Resource):
             return {'status': "Internal server error"}, 500
         
 
+@pegawai_ns.route('/jumlah-non-direksi')
+class JumlahPegawaiNonDireksiResource(Resource):
+    @role_required('admin')
+    def get(self):
+        """Akses: (admin), Mengambil jumlah pegawai dengan id_jenis != 1"""
+        try:
+            jumlah = get_jumlah_pegawai_non_direksi()
+            return {'status': 'success', 'jumlah': jumlah}, 200
+        except SQLAlchemyError as e:
+            logging.error(f"Database error: {str(e)}")
+            return {'status': 'error', 'message': 'Internal server error'}, 500
+
+
 @pegawai_ns.route('/<int:id_karyawan>')
 class PegawaiDetailResource(Resource):
     @jwt_required()
@@ -66,7 +94,7 @@ class PegawaiDetailResource(Resource):
             logging.error(f"Database error: {str(e)}")
             return {'status': "Internal server error"}, 500
         
-    @pegawai_ns.expect(pegawai_model)
+    @pegawai_ns.expect(edit_pegawai_model)
     @jwt_required()
     def put(self, id_karyawan):
         """Akses: (admin, karyawan), Edit data pegawai berdasarkan ID"""
@@ -79,7 +107,7 @@ class PegawaiDetailResource(Resource):
             return {"status": f"Data pegawai {updated[0].title()} berhasil diupdate"}, 200
         except SQLAlchemyError as e:
             logging.error(f"Database error: {str(e)}")
-            return {'status': "Internal server error"}, 500  
+            return {'status': "Internal server error"}, 500
         
     @role_required('admin')
     def delete(self, id_karyawan):
