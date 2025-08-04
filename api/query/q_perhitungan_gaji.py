@@ -238,7 +238,7 @@ def get_gaji_harian(tanggal: date, id_karyawan: int):
                     return {'status': 'Tidak ada hari kerja di bulan ini'}, 400
                 gaji_perhari = gaji_pokok / hari_optimal
             else:  # Pegawai Tidak Tetap
-                gaji_perhari = gaji_pokok / 26  # Tetap 26
+                gaji_perhari = gaji_pokok  # Pegawai Tidak Tetap langsung gaji harian
 
             # Hitung gaji per menit
             gaji_permenit = gaji_perhari / 8 / 60
