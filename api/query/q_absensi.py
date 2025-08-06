@@ -239,7 +239,7 @@ def get_history_absensi_harian(id_karyawan, tanggal):
                     INNER JOIN Karyawan k ON k.id_karyawan = a.id_karyawan 
                     INNER JOIN StatusPresensi s ON a.id_status = s.id_status 
                     INNER JOIN TipeKaryawan t ON k.id_tipe = t.id_tipe 
-                    WHERE a.id_karyawan = :id_karyawan AND a.status = 1 AND a.tanggal = :tanggal;
+                    WHERE a.id_karyawan = :id_karyawan AND a.status = 1 AND k.status = 1 AND a.tanggal = :tanggal;
                 """),
                 {"tanggal": tanggal, "id_karyawan": id_karyawan}
             )
@@ -284,7 +284,7 @@ def query_absensi_harian_admin(tanggal):
                     INNER JOIN Karyawan k ON k.id_karyawan = a.id_karyawan 
                     INNER JOIN Jeniskaryawan j ON k.id_jenis = j.id_jenis 
                     INNER JOIN StatusPresensi s ON a.id_status = s.id_status 
-                    WHERE a.status = 1 AND a.id_status = 1 AND a.tanggal = :tanggal;
+                    WHERE a.status = 1  AND k.status = 1 AND a.id_status = 1 AND a.tanggal = :tanggal;
                 """),
                 {"tanggal": tanggal}
             )

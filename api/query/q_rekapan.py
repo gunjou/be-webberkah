@@ -49,7 +49,7 @@ def get_rekap_absensi(start_date, end_date, libur_nasional):
                 LEFT JOIN statuspresensi sp ON a.id_status = sp.id_status
                 LEFT JOIN jeniskaryawan jk ON k.id_jenis = jk.id_jenis
                 LEFT JOIN tipekaryawan tk ON k.id_tipe = tk.id_tipe
-                WHERE a.tanggal BETWEEN :start_date AND :end_date AND a.status = 1
+                WHERE a.tanggal BETWEEN :start_date AND :end_date AND a.status = 1 AND k.status = 1
                 GROUP BY 
                     k.id_karyawan, k.nama, k.gaji_pokok, 
                     k.id_jenis, jk.jenis, 
