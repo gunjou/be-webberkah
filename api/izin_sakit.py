@@ -291,6 +291,20 @@ class SetujuiIzinResource(Resource):
             return {'status': 'ID izin tidak ditemukan'}, 404
 
         return {'status': 'Izin berhasil disetujui dan dicatat ke absensi'}, 200
+    
+    
+@izin_ns.route('/<int:id_izin>/setujui-potong-cuti')
+class SetujuiIzinPotongCutiResource(Resource):
+    @role_required('admin')
+    def put(self, id_izin):
+        """Akses: (admin), Menyetujui izin dan memotong cuti"""
+        success = setujui_izin_potong_cuti(id_izin)
+        if success is None:
+            return {'status': 'Gagal menyetujui izin'}, 500
+        if success == 0:
+            return {'status': 'ID izin tidak ditemukan'}, 404
+
+        return {'status': 'Izin berhasil disetujui, cuti terpotong dan dicatat ke absensi'}, 200
 
 
 @izin_ns.route('/<int:id_izin>/tolak')

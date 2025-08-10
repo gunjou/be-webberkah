@@ -86,6 +86,23 @@ def format_jam_menit(menit):
 def time_to_str(value):
     return value.strftime('%H:%M:%S') if isinstance(value, time) else None
 
+def serialize_row(row):
+    # Jika row tidak memiliki .keys() dan .items(), maka tidak bisa di-serialize
+    if not hasattr(row, "keys"):
+        raise TypeError("Row input must be a dict-like object with .keys() method")
+    serialized = {}
+    for key in row.keys():
+        value = row[key]
+        if isinstance(value, datetime):
+            serialized[key] = value.strftime("%Y-%m-%d %H:%M:%S")
+        elif isinstance(value, date):
+            serialized[key] = value.strftime("%Y-%m-%d")
+        elif isinstance(value, time):
+            serialized[key] = value.strftime("%H:%M:%S")
+        else:
+            serialized[key] = value
+    return serialized
+
 def daterange(start_date, end_date):
     for n in range((end_date - start_date).days + 1):
         yield start_date + timedelta(days=n)

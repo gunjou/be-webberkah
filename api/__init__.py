@@ -15,9 +15,11 @@ from .absensi import absensi_ns
 from .rekapan import rekapan_ns
 from .perhitungan_gaji import perhitungan_gaji_ns
 from .izin_sakit import izin_ns
+from .cuti import cuti_ns
 from .lembur import lembur_ns
 from .libur import libur_ns
 from .leaderboard import leaderboard_ns
+from .hutang import hutang_ns
 # from .testdb import testdb_ns
 
 from .utils.blacklist_store import is_blacklisted
@@ -83,7 +85,9 @@ restx_api.add_namespace(absensi_ns, path="/absensi")
 restx_api.add_namespace(rekapan_ns, path="/rekapan")
 restx_api.add_namespace(perhitungan_gaji_ns, path="/perhitungan-gaji")
 restx_api.add_namespace(izin_ns, path="/perizinan")
+restx_api.add_namespace(cuti_ns, path="/cuti")
 restx_api.add_namespace(lembur_ns, path="/lembur")
 restx_api.add_namespace(libur_ns, path="/libur")
 restx_api.add_namespace(leaderboard_ns, path="/peringkat")
+restx_api.add_namespace(hutang_ns, path="/hutang")
 # restx_api.add_namespace(testdb_ns, path="/test-db")

@@ -178,11 +178,66 @@ def setujui_izin_dan_insert_absensi(id_izin):
                     "id_status": id_status,
                     "timestamp_wita": get_wita()
                 })
-            connection.commit()
             return 1
     except SQLAlchemyError as e:
-        connection.rollback()
         print(f"DB Error: {str(e)}")
+        return None
+    
+def setujui_izin_potong_cuti(id_izin):
+    engine = get_connection()
+    try:
+        with engine.begin() as connection:
+            # Ambil data izin
+            izin_result = connection.execute(text("""
+                SELECT * FROM izin WHERE id_izin = :id AND status = 1
+            """), {"id": id_izin}).mappings().fetchone()
+
+            if not izin_result:
+                return 0
+
+            # Hitung jumlah hari cuti dari tanggal mulai sampai selesai
+            tgl_mulai = izin_result["tgl_mulai"]
+            tgl_selesai = izin_result["tgl_selesai"]
+            potong_cuti = sum(1 for _ in daterange(tgl_mulai, tgl_selesai))  # jumlah hari
+            # Data untuk absensi
+            id_karyawan = izin_result["id_karyawan"]
+            id_status = 8 # 8 = Izin (-cuti)
+
+            # Update status_izin dan potong_cuti
+            connection.execute(text("""
+                UPDATE izin 
+                SET status_izin = 'approved (-cuti)', 
+                    potong_cuti = :potong_cuti,
+                    id_jenis = :id_status,
+                    updated_at = :timestamp_wita
+                WHERE id_izin = :id
+            """), {
+                "id": id_izin,
+                "potong_cuti": potong_cuti,
+                "id_status": id_status,
+                "timestamp_wita": get_wita()
+            })
+
+            # Tambahkan Data untuk absensi
+            for tanggal in daterange(tgl_mulai, tgl_selesai):
+                connection.execute(text("""
+                    INSERT INTO absensi (
+                        id_karyawan, tanggal, id_status, status,
+                        created_at, updated_at
+                    ) VALUES (
+                        :id_karyawan, :tanggal, :id_status, 1,
+                        :timestamp_wita, :timestamp_wita
+                    )
+                """), {
+                    "id_karyawan": id_karyawan,
+                    "tanggal": tanggal,
+                    "id_status": id_status,
+                    "timestamp_wita": get_wita()
+                })
+
+            return 1
+    except SQLAlchemyError as e:
+        print(f"[ERROR] setujui_izin_potong_cuti: {e}")
         return None
     
 def tolak_izin(id_izin, alasan_penolakan):
