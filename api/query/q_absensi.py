@@ -357,7 +357,7 @@ def query_absensi_izin_sakit(tanggal, id_karyawan=None):
                 INNER JOIN statuspresensi sp ON a.id_status = sp.id_status
                 LEFT JOIN karyawan k ON a.id_karyawan = k.id_karyawan AND a.tanggal = :tanggal
                 INNER JOIN JenisKaryawan j ON k.id_jenis = j.id_jenis
-                WHERE k.status = 1 AND a.id_status IN (3, 4, 8)
+                WHERE k.status = 1 AND a.status = 1 AND a.id_status IN (3, 4, 8)
             """
 
             params = {"tanggal": tanggal}
