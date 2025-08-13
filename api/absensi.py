@@ -125,7 +125,7 @@ class AbsensiCheckInResource(Resource):
             if id_jenis is None:
                 return {'status': 'error', 'message': 'Karyawan tidak ditemukan'}, 404
 
-            lokasi_absensi = get_valid_office_name(user_lat, user_lon, id_jenis)
+            lokasi_absensi = get_valid_office_name(user_lat, user_lon, id_karyawan)
 
             if lokasi_absensi is None:
                 if is_wfh_allowed(id_karyawan):
@@ -177,7 +177,7 @@ class AbsensiCheckOutResource(Resource):
             if id_jenis is None:
                 return {'status': 'error', 'message': 'Karyawan tidak ditemukan'}, 404
 
-            lokasi_absensi = get_valid_office_name(user_lat, user_lon, id_jenis)
+            lokasi_absensi = get_valid_office_name(user_lat, user_lon, id_karyawan)
 
             if lokasi_absensi is None:
                 if is_wfh_allowed(id_karyawan):
