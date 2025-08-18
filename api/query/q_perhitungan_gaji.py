@@ -64,6 +64,13 @@ def get_rekap_gaji(start_date: date = None, end_date: date = None, tanggal: date
 
             libur_set = get_libur_nasional(start_date, end_date)
 
+            # hitung sisa hari kerja optimal dari hari ini s.d. akhir bulan
+            sisa_hari_kerja = 0
+            for i in range((end_date - today).days + 1):
+                current_day = today + timedelta(days=i)
+                if current_day.weekday() != 6 and current_day not in libur_set:  # exclude minggu + libur nasional
+                    sisa_hari_kerja += 1
+
             # Hitung hari kerja optimal
             hari_optimal = sum(
                 1 for i in range((end_date - start_date).days + 1)
@@ -86,7 +93,8 @@ def get_rekap_gaji(start_date: date = None, end_date: date = None, tanggal: date
                 LEFT JOIN statuspresensi sp ON a.id_status = sp.id_status
                 LEFT JOIN jeniskaryawan jk ON k.id_jenis = jk.id_jenis
                 LEFT JOIN tipekaryawan tk ON k.id_tipe = tk.id_tipe
-                WHERE a.tanggal BETWEEN :start_date AND :end_date AND a.status = 1 AND k.status = 1
+                LEFT JOIN liburnasional ln ON a.tanggal = ln.tanggal
+                WHERE a.tanggal BETWEEN :start_date AND :end_date AND a.status = 1 AND k.status = 1 AND EXTRACT(DOW FROM a.tanggal) != 0 AND ln.tanggal IS NULL
             """
             params = {'start_date': start_date, 'end_date': end_date}
 
@@ -168,10 +176,18 @@ def get_rekap_gaji(start_date: date = None, end_date: date = None, tanggal: date
                 total_jam_kerja = row['total_jam_kerja'] or 0
                 total_jam_kerja -= 60 * hadir
 
-                gaji_bersih = None
+                gaji_bersih_tanpa_lembur = 0
+                gaji_bersih = 0
+
                 if total_jam_kerja > 0:
+                    # Ada jam kerja (normal case)
                     gaji_bersih_tanpa_lembur = round(gaji_kotor - total_potongan + tunjangan_kehadiran)
-                    gaji_bersih = round(gaji_kotor - total_potongan + total_bayaran_lembur + tunjangan_kehadiran)
+                    gaji_bersih = round(gaji_bersih_tanpa_lembur + total_bayaran_lembur)
+
+                elif total_lembur > 0:
+                    # Tidak ada jam kerja tapi ada lembur
+                    gaji_bersih = round(gaji_kotor - total_potongan + tunjangan_kehadiran + total_bayaran_lembur)
+
 
                 result.append({
                     'id_karyawan': id_karyawan,
@@ -186,7 +202,7 @@ def get_rekap_gaji(start_date: date = None, end_date: date = None, tanggal: date
                     'jumlah_hadir': hadir,
                     'jumlah_izin': izin,
                     'jumlah_sakit': sakit,
-                    'jumlah_alpha': max(0, hari_optimal - (hadir + izin + sakit)),
+                    'jumlah_alpha': max(0, hari_optimal - (sisa_hari_kerja + hadir + izin + sakit)),
                     'total_jam_kerja': total_jam_kerja,
                     'jam_normal': hari_optimal * 480,
                     'jam_terlambat': terlambat,
