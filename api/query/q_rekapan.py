@@ -49,7 +49,8 @@ def get_rekap_absensi(start_date, end_date, libur_nasional):
                 LEFT JOIN statuspresensi sp ON a.id_status = sp.id_status
                 LEFT JOIN jeniskaryawan jk ON k.id_jenis = jk.id_jenis
                 LEFT JOIN tipekaryawan tk ON k.id_tipe = tk.id_tipe
-                WHERE a.tanggal BETWEEN :start_date AND :end_date AND a.status = 1 AND k.status = 1
+                LEFT JOIN liburnasional ln ON a.tanggal = ln.tanggal
+                WHERE a.tanggal BETWEEN :start_date AND :end_date AND a.status = 1 AND k.status = 1 AND EXTRACT(DOW FROM a.tanggal) != 0 AND ln.tanggal IS NULL
                 GROUP BY 
                     k.id_karyawan, k.nama, k.gaji_pokok, 
                     k.id_jenis, jk.jenis, 
@@ -228,7 +229,8 @@ def get_rekap_person(start_date, end_date, id_karyawan):
                 LEFT JOIN statuspresensi sp ON a.id_status = sp.id_status
                 LEFT JOIN jeniskaryawan jk ON k.id_jenis = jk.id_jenis
                 LEFT JOIN tipekaryawan tk ON k.id_tipe = tk.id_tipe
-                WHERE a.tanggal BETWEEN :start_date AND :end_date AND a.status = 1
+                LEFT JOIN liburnasional ln ON a.tanggal = ln.tanggal
+                WHERE a.tanggal BETWEEN :start_date AND :end_date AND a.status = 1 AND EXTRACT(DOW FROM a.tanggal) != 0 AND ln.tanggal IS NULL
                 AND a.id_karyawan = :id_karyawan
                 GROUP BY 
                     k.id_karyawan, k.nama, k.gaji_pokok, 
