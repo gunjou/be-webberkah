@@ -14,6 +14,7 @@ from .tipe_pegawai import tipe_pegawai_ns
 from .absensi import absensi_ns
 from .rekapan import rekapan_ns
 from .perhitungan_gaji import perhitungan_gaji_ns
+from .pembayaran_gaji import pembayaran_gaji_ns
 from .izin_sakit import izin_ns
 from .cuti import cuti_ns
 from .lembur import lembur_ns
@@ -71,7 +72,7 @@ restx_api = Api(
         version="2.0", 
         title="Berkah Angsana", 
         description="Dokumentasi API Berkah Angsana", 
-        doc="/documentation",
+        doc="/docs",
         authorizations=authorizations,
         security='Bearer Auth'
     )
@@ -84,6 +85,7 @@ restx_api.add_namespace(tipe_pegawai_ns, path="/tipe-pegawai")
 restx_api.add_namespace(absensi_ns, path="/absensi")
 restx_api.add_namespace(rekapan_ns, path="/rekapan")
 restx_api.add_namespace(perhitungan_gaji_ns, path="/perhitungan-gaji")
+restx_api.add_namespace(pembayaran_gaji_ns, path="/pembayaran-gaji")
 restx_api.add_namespace(izin_ns, path="/perizinan")
 restx_api.add_namespace(cuti_ns, path="/cuti")
 restx_api.add_namespace(lembur_ns, path="/lembur")
