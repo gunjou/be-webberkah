@@ -95,7 +95,11 @@ def get_rekap_gaji(start_date: date = None, end_date: date = None, tanggal: date
                 LEFT JOIN jeniskaryawan jk ON k.id_jenis = jk.id_jenis
                 LEFT JOIN tipekaryawan tk ON k.id_tipe = tk.id_tipe
                 LEFT JOIN liburnasional ln ON a.tanggal = ln.tanggal
-                WHERE a.tanggal BETWEEN :start_date AND :end_date AND a.status = 1 AND k.status = 1 AND EXTRACT(DOW FROM a.tanggal) != 0 AND ln.tanggal IS NULL
+                WHERE a.tanggal BETWEEN :start_date AND :end_date 
+                  AND a.status = 1 
+                  AND k.status = 1 
+                  AND EXTRACT(DOW FROM a.tanggal) != 0 
+                  AND ln.tanggal IS NULL
             """
             params = {'start_date': start_date, 'end_date': end_date}
 
@@ -139,6 +143,21 @@ def get_rekap_gaji(start_date: date = None, end_date: date = None, tanggal: date
                 for row in connection.execute(tunjangan_query, params).mappings()
             }
 
+            # Kasbon (pembayaran hutang metode potong_gaji)
+            kasbon_query = text("""
+                SELECT h.id_karyawan, COALESCE(SUM(p.nominal), 0) AS total_kasbon
+                FROM pembayaran_hutang p
+                JOIN hutang h ON h.id_hutang = p.id_hutang
+                WHERE p.tanggal BETWEEN :start_date AND :end_date
+                  AND p.status = 1
+                  AND p.metode = 'potong gaji'
+                GROUP BY h.id_karyawan
+            """)
+            kasbon_map = {
+                row['id_karyawan']: row['total_kasbon']
+                for row in connection.execute(kasbon_query, params).mappings()
+            }
+
             result = []
             for row in rows:
                 id_karyawan = row['id_karyawan']
@@ -150,13 +169,11 @@ def get_rekap_gaji(start_date: date = None, end_date: date = None, tanggal: date
                 sakit = row['jumlah_sakit'] or 0
 
                 if tipe_id == 1:  # Pegawai Tetap
-                    # Tetap: gaji pokok dibagi hari optimal
                     gaji_perhari = gaji_pokok / hari_optimal if hari_optimal else 0
                     jumlah_hari_dibayar = min(hadir + izin + sakit, hari_optimal)
                 else:  # Pegawai Tidak Tetap
-                    # Tidak tetap: gaji pokok = gaji per hari langsung dari DB
                     gaji_perhari = gaji_pokok
-                    jumlah_hari_dibayar = hadir  # hanya hadir yang dihitung
+                    jumlah_hari_dibayar = hadir
 
                 gaji_kotor = round(gaji_perhari * jumlah_hari_dibayar)
 
@@ -174,6 +191,8 @@ def get_rekap_gaji(start_date: date = None, end_date: date = None, tanggal: date
 
                 tunjangan_kehadiran = (tunjangan_map.get(id_karyawan) or 0) * 10000
 
+                kasbon = kasbon_map.get(id_karyawan, 0) or 0
+
                 total_jam_kerja = row['total_jam_kerja'] or 0
                 total_jam_kerja -= 60 * hadir
 
@@ -181,14 +200,11 @@ def get_rekap_gaji(start_date: date = None, end_date: date = None, tanggal: date
                 gaji_bersih = 0
 
                 if total_jam_kerja > 0:
-                    # Ada jam kerja (normal case)
-                    gaji_bersih_tanpa_lembur = round(gaji_kotor - total_potongan + tunjangan_kehadiran)
+                    gaji_bersih_tanpa_lembur = round(gaji_kotor - total_potongan + tunjangan_kehadiran - kasbon)
                     gaji_bersih = round(gaji_bersih_tanpa_lembur + total_bayaran_lembur)
 
                 elif total_lembur > 0:
-                    # Tidak ada jam kerja tapi ada lembur
-                    gaji_bersih = round(gaji_kotor - total_potongan + tunjangan_kehadiran + total_bayaran_lembur)
-
+                    gaji_bersih = round(gaji_kotor - total_potongan + tunjangan_kehadiran - kasbon + total_bayaran_lembur)
 
                 result.append({
                     'id_karyawan': id_karyawan,
@@ -213,6 +229,7 @@ def get_rekap_gaji(start_date: date = None, end_date: date = None, tanggal: date
                     'gaji_pokok': round(gaji_pokok),
                     'potongan': total_potongan,
                     'tunjangan_kehadiran': tunjangan_kehadiran,
+                    'kasbon': kasbon,
                     'total_lembur': total_lembur,
                     'total_menit_lembur': total_menit_lembur,
                     'gaji_kotor': gaji_kotor,

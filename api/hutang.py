@@ -172,3 +172,26 @@ class PembayaranHutangResource(Resource):
             return result, status
         except Exception as e:
             return {"status": "error", "message": str(e)}, 500
+        
+    @hutang_ns.doc(params={
+        'bulan': '(opsional) Format YYYY-MM, default bulan ini',
+        'id_karyawan': '(opsional) Filter berdasarkan ID karyawan',
+        'metode': '(opsional) Filter berdasarkan metode pembayaran (misal: tunai, potong gaji)'
+    })
+    @role_required("admin")
+    def get(self):
+        """Akses: (admin), Mendapatkan riwayat pembayaran hutang"""
+        try:
+            bulan = request.args.get("bulan", None)
+            id_karyawan = request.args.get("id_karyawan", None)
+            metode = request.args.get("metode", None)
+
+            data = get_pembayaran_hutang(bulan=bulan, id_karyawan=id_karyawan, metode=metode)
+
+            return {
+                "status": "success",
+                "message": "Berhasil mengambil riwayat pembayaran",
+                "data": data
+            }, 200
+        except Exception as e:
+            return {"status": "error", "message": str(e)}, 500

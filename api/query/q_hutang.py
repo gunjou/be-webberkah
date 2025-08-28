@@ -263,3 +263,41 @@ def create_pembayaran_hutang_by_karyawan(id_karyawan, nominal, metode, keteranga
             return {"message": f"Pembayaran berhasil dicatat sebanyak {nominal - sisa_nominal}."}, 200
     except Exception as e:
         return {"message": str(e)}, 500
+
+def get_pembayaran_hutang(bulan=None, id_karyawan=None, metode=None):
+    engine = get_connection()
+    try:
+        with engine.connect() as conn:
+            base_query = """
+                SELECT 
+                    p.id_pembayaran, p.id_hutang, h.id_karyawan, k.nama, k.nama_panggilan,
+                    p.nominal, p.metode, p.keterangan, p.tanggal, p.created_at
+                FROM pembayaran_hutang p
+                JOIN hutang h ON h.id_hutang = p.id_hutang
+                JOIN karyawan k ON k.id_karyawan = h.id_karyawan
+                WHERE p.status = 1
+            """
+            params = {}
+
+            # Default filter ke bulan ini
+            if not bulan:
+                bulan = datetime.now().strftime("%Y-%m")
+
+            base_query += " AND TO_CHAR(p.tanggal, 'YYYY-MM') = :bulan"
+            params["bulan"] = bulan
+
+            if id_karyawan:
+                base_query += " AND h.id_karyawan = :id_karyawan"
+                params["id_karyawan"] = id_karyawan
+
+            if metode:
+                base_query += " AND p.metode = :metode"
+                params["metode"] = metode
+
+            base_query += " ORDER BY p.created_at DESC"
+
+            result = conn.execute(text(base_query), params).mappings().all()
+            return [serialize_row(row) for row in result]
+    except SQLAlchemyError as e:
+        print(f"[ERROR] get_pembayaran_hutang: {e}")
+        return []
