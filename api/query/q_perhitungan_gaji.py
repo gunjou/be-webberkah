@@ -149,6 +149,7 @@ def get_rekap_gaji(start_date: date = None, end_date: date = None, tanggal: date
                 FROM pembayaran_hutang p
                 JOIN hutang h ON h.id_hutang = p.id_hutang
                 WHERE p.tanggal BETWEEN :start_date AND :end_date
+                  AND h.status = 1
                   AND p.status = 1
                   AND p.metode = 'potong gaji'
                 GROUP BY h.id_karyawan

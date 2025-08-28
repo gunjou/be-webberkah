@@ -147,3 +147,27 @@ def change_password_pegawai(id_karyawan, plain_password):
     except SQLAlchemyError as e:
         print(f"Error: {e}")
         return None
+
+"""PEGAWAI YANG MEMILIKI HUTANG"""
+def get_pegawai_berhutang():
+    engine = get_connection()
+    try:
+        with engine.connect() as connection:
+            result = connection.execute(text("""
+                SELECT DISTINCT 
+                    k.id_karyawan, k.nip, k.id_jenis, j.jenis, 
+                    k.id_tipe, t.tipe, k.nama, k.nama_panggilan, 
+                    k.gaji_pokok, k.username, k.password, 
+                    k.kode_pemulihan, k.bank, k.no_rekening
+                FROM karyawan k
+                INNER JOIN jeniskaryawan j ON k.id_jenis = j.id_jenis
+                INNER JOIN tipekaryawan t ON k.id_tipe = t.id_tipe
+                INNER JOIN hutang h ON h.id_karyawan = k.id_karyawan
+                WHERE k.status = 1 
+                  AND h.status = 1
+                  AND h.status_hutang = 'belum lunas'
+            """)).mappings().fetchall()
+            return [dict(row) for row in result]
+    except SQLAlchemyError as e:
+        print(f"Error occurred: {str(e)}")
+        return []

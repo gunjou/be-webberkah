@@ -144,3 +144,19 @@ class PegawaiPasswordResource(Resource):
         except SQLAlchemyError as e:
             logging.error(f"Database error: {str(e)}")
             return {"status": "Internal server error"}, 500
+
+
+"""PEGAWAI YANG MEMILIKI HUTANG"""
+@pegawai_ns.route('/berhutang')
+class PegawaiBerhutangResource(Resource):
+    @role_required('admin')
+    def get(self):
+        """Akses: (admin), Mengambil list pegawai yang masih memiliki hutang belum lunas"""
+        try:
+            result = get_pegawai_berhutang()
+            if not result:
+                return {'status': 'error', 'message': 'Tidak ada pegawai dengan hutang aktif'}, 404
+            return result, 200
+        except SQLAlchemyError as e:
+            logging.error(f"Database error: {str(e)}")
+            return {'status': "Internal server error"}, 500

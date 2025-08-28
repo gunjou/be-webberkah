@@ -138,7 +138,9 @@ class HutangByKaryawan(Resource):
                 "status": "success",
                 "message": "Berhasil mengambil data hutang",
                 "data": result["data"],
-                "total_hutang": result["total_hutang"]
+                "total_hutang": result["total_hutang"],
+                "hutang_terbayarkan": result["hutang_terbayarkan"],
+                "sisa_hutang": result["sisa_hutang"]
             }, 200
         except Exception as e:
             return {"status": "error", "message": str(e)}, 500
@@ -176,6 +178,7 @@ class PembayaranHutangResource(Resource):
     @hutang_ns.doc(params={
         'bulan': '(opsional) Format YYYY-MM, default bulan ini',
         'id_karyawan': '(opsional) Filter berdasarkan ID karyawan',
+        'id_hutang': '(opsional) Filter berdasarkan ID hutang',
         'metode': '(opsional) Filter berdasarkan metode pembayaran (misal: tunai, potong gaji)'
     })
     @role_required("admin")
@@ -184,9 +187,10 @@ class PembayaranHutangResource(Resource):
         try:
             bulan = request.args.get("bulan", None)
             id_karyawan = request.args.get("id_karyawan", None)
+            id_hutang = request.args.get("id_hutang", None)
             metode = request.args.get("metode", None)
 
-            data = get_pembayaran_hutang(bulan=bulan, id_karyawan=id_karyawan, metode=metode)
+            data = get_pembayaran_hutang(bulan=bulan, id_karyawan=id_karyawan, id_hutang=id_hutang, metode=metode)
 
             return {
                 "status": "success",
@@ -195,3 +199,4 @@ class PembayaranHutangResource(Resource):
             }, 200
         except Exception as e:
             return {"status": "error", "message": str(e)}, 500
+        

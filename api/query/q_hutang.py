@@ -5,36 +5,53 @@ from sqlalchemy.exc import SQLAlchemyError
 from ..utils.helpers import serialize_row
 from ..utils.config import get_connection, get_wita, get_timezone
 
+# query/q_hutang.py
 def get_all_hutang(status_hutang=None):
     engine = get_connection()
     try:
         with engine.connect() as conn:
             base_query = """
                 SELECT 
-                    h.id_hutang, h.id_karyawan, k.nama, k.nama_panggilan, h.nominal, h.keterangan,
-                    h.status_hutang, h.tanggal, h.created_at, h.updated_at
+                    h.id_hutang, 
+                    h.id_karyawan, 
+                    k.nama, 
+                    k.nama_panggilan, 
+                    h.nominal, 
+                    h.keterangan,
+                    h.status_hutang, 
+                    h.tanggal, 
+                    h.created_at, 
+                    h.updated_at,
+                    COALESCE(SUM(ph.nominal), 0) AS hutang_terbayarkan,
+                    (h.nominal - COALESCE(SUM(ph.nominal), 0)) AS sisa_hutang
                 FROM hutang h
                 JOIN karyawan k ON k.id_karyawan = h.id_karyawan
-                WHERE h.status = 1 AND k.status = 1
+                LEFT JOIN pembayaran_hutang ph 
+                    ON ph.id_hutang = h.id_hutang AND ph.status = 1
+                WHERE h.status = 1 
+                  AND k.status = 1
             """
 
-            # Tambahkan filter jika status_hutang diberikan
+            params = {}
+
             if status_hutang:
                 base_query += " AND h.status_hutang = :status_hutang"
+                params["status_hutang"] = status_hutang
 
-            base_query += " ORDER BY h.created_at DESC;"
+            base_query += """
+                GROUP BY h.id_hutang, h.id_karyawan, k.nama, k.nama_panggilan, 
+                         h.nominal, h.keterangan, h.status_hutang, h.tanggal, 
+                         h.created_at, h.updated_at
+                ORDER BY h.created_at DESC
+            """
 
-            stmt = text(base_query)
+            result = conn.execute(text(base_query), params).mappings().fetchall()
+            return [serialize_row(row) for row in result]
 
-            if status_hutang:
-                result = conn.execute(stmt, {"status_hutang": status_hutang})
-            else:
-                result = conn.execute(stmt)
-
-            return [serialize_row(row) for row in result.mappings().fetchall()]
     except SQLAlchemyError as e:
         print(f"[error GET hutang] {e}")
         return []
+
 
 def insert_hutang(id_karyawan, tanggal, nominal, keterangan):
     engine = get_connection()
@@ -126,10 +143,12 @@ def soft_delete_hutang_by_id(id_hutang):
         print(f"[error SOFT DELETE hutang] {e}")
         return None
     
+# query/q_hutang.py
 def get_hutang_by_karyawan(id_karyawan, status_hutang=None):
     engine = get_connection()
     try:
         with engine.connect() as conn:
+            # Query daftar hutang
             base_query = """
                 SELECT 
                     h.id_hutang, h.id_karyawan, k.nama, k.nama_panggilan, h.nominal, h.keterangan, 
@@ -148,7 +167,7 @@ def get_hutang_by_karyawan(id_karyawan, status_hutang=None):
             result = conn.execute(text(base_query), params).mappings().all()
             list_hutang = [serialize_row(row) for row in result]
 
-            # Query total nominal hutang
+            # Query total hutang
             total_query = """
                 SELECT COALESCE(SUM(nominal), 0) AS total_hutang
                 FROM hutang
@@ -157,11 +176,30 @@ def get_hutang_by_karyawan(id_karyawan, status_hutang=None):
             if status_hutang in ["lunas", "belum lunas"]:
                 total_query += " AND status_hutang = :status_hutang"
 
-            total_hutang = conn.execute(text(total_query), params).scalar()
+            total_hutang = conn.execute(text(total_query), params).scalar() or 0
+
+            # Query total hutang terbayarkan (ambil dari tabel pembayaran_hutang)
+            terbayar_query = """
+                SELECT COALESCE(SUM(ph.nominal), 0) AS hutang_terbayarkan
+                FROM pembayaran_hutang ph
+                JOIN hutang h ON ph.id_hutang = h.id_hutang
+                WHERE h.id_karyawan = :id_karyawan
+                  AND ph.status = 1
+                  AND h.status = 1
+            """
+            if status_hutang in ["lunas", "belum lunas"]:
+                terbayar_query += " AND h.status_hutang = :status_hutang"
+
+            hutang_terbayarkan = conn.execute(text(terbayar_query), params).scalar() or 0
+
+            # Hitung sisa hutang
+            sisa_hutang = total_hutang - hutang_terbayarkan
 
             return {
                 "data": list_hutang,
-                "total_hutang": total_hutang
+                "total_hutang": total_hutang,
+                "hutang_terbayarkan": hutang_terbayarkan,
+                "sisa_hutang": sisa_hutang
             }
     except SQLAlchemyError as e:
         print(f"[ERROR] get_hutang_by_karyawan: {e}")
@@ -264,7 +302,7 @@ def create_pembayaran_hutang_by_karyawan(id_karyawan, nominal, metode, keteranga
     except Exception as e:
         return {"message": str(e)}, 500
 
-def get_pembayaran_hutang(bulan=None, id_karyawan=None, metode=None):
+def get_pembayaran_hutang(bulan=None, id_karyawan=None, id_hutang=None, metode=None):
     engine = get_connection()
     try:
         with engine.connect() as conn:
@@ -282,13 +320,16 @@ def get_pembayaran_hutang(bulan=None, id_karyawan=None, metode=None):
             # Default filter ke bulan ini
             if not bulan:
                 bulan = datetime.now().strftime("%Y-%m")
-
             base_query += " AND TO_CHAR(p.tanggal, 'YYYY-MM') = :bulan"
             params["bulan"] = bulan
 
             if id_karyawan:
                 base_query += " AND h.id_karyawan = :id_karyawan"
                 params["id_karyawan"] = id_karyawan
+
+            if id_hutang:
+                base_query += " AND p.id_hutang = :id_hutang"
+                params["id_hutang"] = id_hutang
 
             if metode:
                 base_query += " AND p.metode = :metode"

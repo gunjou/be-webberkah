@@ -32,6 +32,11 @@ def insert_komponen_pembayaran(id_karyawan, perhitungan, bulan, tahun, komponen,
     """
     Helper untuk insert detail pembayaran 1 komponen (gaji_pokok, tunjangan, lembur).
     """
+
+    # Normalisasi nama komponen
+    if komponen in ["gaji_bersih", "gaji_pokok"]:
+        komponen = "gaji_pokok"
+
     data_pembayaran = {
         "id_karyawan": id_karyawan,
         "bulan": bulan,
@@ -221,7 +226,7 @@ class PembayaranGajiPokokResource(Resource):
         metode = data.get("metode", "transfer")
         keterangan = f"pembayaran gaji pokok {perhitungan['nama']}"
 
-        sudah_ada = cek_detail_sudah_ada(id_karyawan, bulan, tahun, komponen="gaji_bersih")
+        sudah_ada = cek_detail_sudah_ada(id_karyawan, bulan, tahun, komponen="gaji_pokok")
         if sudah_ada:
             return {
                 "status": "error",
