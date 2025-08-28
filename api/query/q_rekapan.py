@@ -29,6 +29,8 @@ def get_rekap_absensi(start_date, end_date, libur_nasional):
                 SELECT 
                     k.id_karyawan,
                     k.nama,
+                    k.nama_panggilan,
+                    k.nip,
                     k.gaji_pokok,
                     k.id_jenis,
                     jk.jenis,
@@ -104,6 +106,8 @@ def get_detail_absensi_by_karyawan(id_karyawan, start, end):
                     a.total_jam_kerja AS total_jam_masuk, a.lokasi_masuk, a.lokasi_keluar,
                     s.id_status, s.nama_status,
                     k.nama AS nama_karyawan,
+                    k.nama_panggilan,
+                    k.nip,
                     j.jenis AS jenis_pegawai,
                     t.tipe AS tipe_pegawai
                 FROM absensi a
@@ -135,6 +139,7 @@ def get_detail_absensi_by_karyawan(id_karyawan, start, end):
                     'id_status': data.get('id_status'),
                     'nama_status': data.get('nama_status'),
                     'nama_karyawan': data.get('nama_karyawan'),
+                    'nama_panggilan': data.get('nama_panggilan'),
                     'jenis_pegawai': data.get('jenis_pegawai'),
                     'tipe_pegawai': data.get('tipe_pegawai'),
                 }
@@ -146,7 +151,7 @@ def get_detail_absensi_by_karyawan(id_karyawan, start, end):
 
             # Ambil info karyawan
             karyawan_result = connection.execute(text("""
-                SELECT k.nama, j.jenis AS jenis_pegawai, t.tipe AS tipe_pegawai
+                SELECT k.nama, k.nama_panggilan, j.jenis AS jenis_pegawai, t.tipe AS tipe_pegawai
                 FROM karyawan k
                 JOIN jeniskaryawan j ON k.id_jenis = j.id_jenis
                 JOIN tipekaryawan t ON k.id_tipe = t.id_tipe
@@ -157,6 +162,7 @@ def get_detail_absensi_by_karyawan(id_karyawan, start, end):
                 return []
 
             nama_karyawan = karyawan_result.nama
+            nama_panggilan = karyawan_result.nama_panggilan
             jenis_pegawai = karyawan_result.jenis_pegawai
             tipe_pegawai = karyawan_result.tipe_pegawai
 
@@ -178,6 +184,7 @@ def get_detail_absensi_by_karyawan(id_karyawan, start, end):
                 else:
                     hasil.append({
                         'nama_karyawan': nama_karyawan,
+                        'nama_panggilan': nama_panggilan,
                         'tanggal': tanggal_str,
                         'status_hari': status_hari,
                         'id_status': 0,
@@ -209,6 +216,7 @@ def get_rekap_person(start_date, end_date, id_karyawan):
                 SELECT 
                     k.id_karyawan,
                     k.nama,
+                    k.nama_panggilan,
                     k.gaji_pokok,
                     k.id_jenis,
                     jk.jenis,
@@ -255,6 +263,7 @@ def get_list_rekapan_person(start_date, end_date, id_karyawan):
             query = text("""
                 SELECT 
                     k.nama,
+                    k.nama_panggilan,
                     s.nama_status,
                     t.tipe,
                     a.tanggal,

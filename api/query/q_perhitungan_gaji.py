@@ -79,7 +79,8 @@ def get_rekap_gaji(start_date: date = None, end_date: date = None, tanggal: date
 
             query = """
                 SELECT 
-                    k.id_karyawan, k.nip, k.nama, k.gaji_pokok, k.bank, k.no_rekening,
+                    k.id_karyawan, k.nip, k.nama, k.nama_panggilan, k.gaji_pokok, 
+                    k.bank, k.no_rekening, k.an_rekening,
                     jk.id_jenis, jk.jenis, 
                     tk.id_tipe, tk.tipe,
                     SUM(a.jam_terlambat) AS total_jam_terlambat,
@@ -193,10 +194,12 @@ def get_rekap_gaji(start_date: date = None, end_date: date = None, tanggal: date
                     'id_karyawan': id_karyawan,
                     'nip': row['nip'],
                     'nama': row['nama'],
+                    'nama_panggilan': row['nama_panggilan'],
                     'id_tipe': tipe_id,
                     'tipe': row['tipe'],
                     'bank': row['bank'],
                     'no_rekening': row['no_rekening'],
+                    'an_rekening': row['an_rekening'],
                     'periode_awal': start_date.strftime('%d %b %Y'),
                     'periode_akhir': end_date.strftime('%d %b %Y'),
                     'jumlah_hadir': hadir,
@@ -230,7 +233,7 @@ def get_gaji_harian(tanggal: date, id_karyawan: int):
             # Ambil data absensi dan info karyawan
             result = conn.execute(text("""
                 SELECT 
-                    a.id_karyawan, k.nama, tk.id_tipe, tk.tipe AS tipe_karyawan,
+                    a.id_karyawan, k.nama, k.nama_panggilan, tk.id_tipe, tk.tipe AS tipe_karyawan,
                     k.gaji_pokok,
                     a.jam_masuk, a.jam_keluar,
                     a.jam_terlambat, a.jam_kurang,
@@ -279,6 +282,7 @@ def get_gaji_harian(tanggal: date, id_karyawan: int):
             return {
                 'id_karyawan': result['id_karyawan'],
                 'nama': result['nama'],
+                'nama_panggilan': result['nama_panggilan'],
                 'id_tipe': id_tipe,
                 'tipe_karyawan': result['tipe_karyawan'],
                 'jam_masuk': result['jam_masuk'].strftime('%H:%M') if result['jam_masuk'] else None,

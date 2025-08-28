@@ -47,6 +47,7 @@ def hitung_pembayaran_gaji(start: date, end: date, id_karyawan: int):
         return {
             "id_karyawan": id_karyawan,
             "nama": data["nama"],
+            "nama_panggilan": data["nama_panggilan"],
             "gaji_bersih": data["gaji_bersih_tanpa_lembur"],
             "tunjangan": data["tunjangan_kehadiran"],
             "lembur": data["total_bayaran_lembur"],

@@ -116,7 +116,7 @@ def get_daftar_lembur(status_lembur=None, id_karyawan=None, start_date=None, end
     try:
         with engine.connect() as connection:
             query = """
-                SELECT l.id_lembur, l.id_karyawan, k.nama AS nama_karyawan,
+                SELECT l.id_lembur, l.id_karyawan, k.nama AS nama_karyawan, k.nama_panggilan,
                        l.tanggal, l.jam_mulai, l.jam_selesai,
                        l.keterangan, l.path_lampiran, l.status_lembur,
                        l.alasan_penolakan, l.bayaran_perjam, l.total_bayaran, l.menit_lembur,
@@ -181,7 +181,7 @@ def get_daftar_lembur_oleh_karyawan(id_karyawan, tanggal=None):
     try:
         with engine.connect() as connection:
             query = """
-                SELECT l.id_lembur, l.id_karyawan, k.nama AS nama_karyawan,
+                SELECT l.id_lembur, l.id_karyawan, k.nama AS nama_karyawan, k.nama_panggilan,
                        l.tanggal, l.jam_mulai, l.jam_selesai,
                        l.keterangan, l.path_lampiran, l.status_lembur,
                        l.alasan_penolakan, l.bayaran_perjam, l.total_bayaran,

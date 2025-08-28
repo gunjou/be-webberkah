@@ -12,7 +12,7 @@ def get_all_pegawai():
     try:
         with engine.connect() as connection:
             result = connection.execute(text("""
-                SELECT k.id_karyawan, k.nip, k.id_jenis, j.jenis, k.id_tipe, t.tipe, k.nama, k.gaji_pokok, k.username, k.password, k.kode_pemulihan, k.bank, k.no_rekening
+                SELECT k.id_karyawan, k.nip, k.id_jenis, j.jenis, k.id_tipe, t.tipe, k.nama, k.nama_panggilan, k.gaji_pokok, k.username, k.password, k.kode_pemulihan, k.bank, k.no_rekening
                 FROM karyawan k
                 INNER JOIN jeniskaryawan j ON k.id_jenis = j.id_jenis
                 INNER JOIN tipekaryawan t ON k.id_tipe = t.id_tipe
@@ -66,7 +66,7 @@ def get_pegawai_by_id(id_karyawan):
     try:
         with engine.connect() as connection:
             result = connection.execute(text("""
-                SELECT k.id_karyawan, k.nip, k.id_jenis, j.jenis, k.id_tipe, t.tipe, k.nama, 
+                SELECT k.id_karyawan, k.nip, k.id_jenis, j.jenis, k.id_tipe, t.tipe, k.nama, k.nama_panggilan, 
                 k.bank, k.no_rekening, k.gaji_pokok, k.username, k.password, k.kode_pemulihan
                 FROM karyawan k
                 INNER JOIN jeniskaryawan j ON k.id_jenis = j.id_jenis

@@ -232,7 +232,7 @@ def get_history_absensi_harian(id_karyawan, tanggal):
         with engine.connect() as connection:
             query_result = connection.execute(
                 text("""
-                    SELECT a.id_karyawan, k.nama, s.id_status, t.id_tipe, t.tipe,
+                    SELECT a.id_karyawan, k.nama, k.nama_panggilan, s.id_status, t.id_tipe, t.tipe,
                            a.jam_masuk, a.jam_keluar, a.lokasi_masuk, a.lokasi_keluar,
                            a.jam_terlambat, a.jam_kurang AS jam_bolos, a.total_jam_kerja
                     FROM Absensi a 
@@ -255,6 +255,7 @@ def get_history_absensi_harian(id_karyawan, tanggal):
                 result.append({
                     'id_karyawan': row['id_karyawan'],
                     'nama': row['nama'],
+                    'nama_panggilan': row['nama_panggilan'],
                     'id_status': row['id_status'],
                     'id_tipe': row['id_tipe'],
                     'tipe': row['tipe'],
@@ -277,7 +278,7 @@ def query_absensi_harian_admin(tanggal):
         with engine.connect() as connection:
             result = connection.execute(
                 text("""
-                    SELECT a.id_absensi, a.id_karyawan, k.nama, k.id_jenis, j.jenis, a.tanggal, a.jam_masuk, a.jam_keluar, 
+                    SELECT a.id_absensi, a.id_karyawan, k.nama, k.nama_panggilan, k.id_jenis, j.jenis, a.tanggal, a.jam_masuk, a.jam_keluar, 
                     a.jam_terlambat, a.jam_kurang, a.total_jam_kerja, a.lokasi_masuk, a.lokasi_keluar, s.id_status AS id_presensi, 
                     s.nama_status AS status_presensi  
                     FROM Absensi a 
@@ -294,6 +295,7 @@ def query_absensi_harian_admin(tanggal):
                 'id_absensi': row['id_absensi'],
                 'id_karyawan': row['id_karyawan'],
                 'nama': row['nama'],
+                'nama_panggilan': row['nama_panggilan'],
                 'id_jenis': row['id_jenis'],
                 'jenis': row['jenis'],
                 'tanggal': row['tanggal'].strftime("%d-%m-%Y"),
@@ -322,7 +324,7 @@ def query_absensi_tidak_hadir(tanggal):
         with engine.connect() as connection:
             result = connection.execute(
                 text("""
-                    SELECT k.id_karyawan, k.nama, k.id_jenis, j.jenis, :tanggal AS tanggal
+                    SELECT k.id_karyawan, k.nama, k.nama_panggilan, k.id_jenis, j.jenis, :tanggal AS tanggal
                     FROM Karyawan k
                     JOIN JenisKaryawan j ON k.id_jenis = j.id_jenis
                     LEFT JOIN Absensi a ON k.id_karyawan = a.id_karyawan AND a.tanggal = :tanggal
@@ -337,6 +339,7 @@ def query_absensi_tidak_hadir(tanggal):
                 "id": index + 1,
                 "id_karyawan": row["id_karyawan"],
                 "nama": row["nama"],
+                "nama_panggilan": row["nama_panggilan"],
                 "id_jenis": row["id_jenis"],
                 "jenis": row["jenis"],
                 "tanggal": row["tanggal"].strftime("%d-%m-%Y"),
@@ -352,7 +355,7 @@ def query_absensi_izin_sakit(tanggal, id_karyawan=None):
     try:
         with engine.connect() as connection:
             query = """
-                SELECT k.id_karyawan, k.nama, k.id_jenis, j.jenis, a.id_status, sp.nama_status, :tanggal AS tanggal
+                SELECT k.id_karyawan, k.nama, k.nama_panggilan, k.id_jenis, j.jenis, a.id_status, sp.nama_status, :tanggal AS tanggal
                 FROM absensi a
                 INNER JOIN statuspresensi sp ON a.id_status = sp.id_status
                 LEFT JOIN karyawan k ON a.id_karyawan = k.id_karyawan AND a.tanggal = :tanggal
@@ -373,6 +376,7 @@ def query_absensi_izin_sakit(tanggal, id_karyawan=None):
                 "id": index + 1,
                 "id_karyawan": row["id_karyawan"],
                 "nama": row["nama"],
+                "nama_panggilan": row["nama_panggilan"],
                 "id_status": row["id_status"],
                 "status_absen": row["nama_status"],
                 "id_jenis": row["id_jenis"],

@@ -11,7 +11,7 @@ def get_all_hutang(status_hutang=None):
         with engine.connect() as conn:
             base_query = """
                 SELECT 
-                    h.id_hutang, h.id_karyawan, k.nama, h.nominal, h.keterangan,
+                    h.id_hutang, h.id_karyawan, k.nama, k.nama_panggilan, h.nominal, h.keterangan,
                     h.status_hutang, h.tanggal, h.created_at, h.updated_at
                 FROM hutang h
                 JOIN karyawan k ON k.id_karyawan = h.id_karyawan
@@ -69,7 +69,7 @@ def get_hutang_by_id(id_hutang):
         with engine.connect() as conn:
             result = conn.execute(text("""
                 SELECT 
-                    h.id_hutang, h.id_karyawan, k.nama, h.nominal, h.keterangan,
+                    h.id_hutang, h.id_karyawan, k.nama, k.nama_panggilan, h.nominal, h.keterangan,
                     h.status_hutang, h.tanggal, h.created_at, h.updated_at
                 FROM hutang h
                 JOIN karyawan k ON k.id_karyawan = h.id_karyawan
@@ -132,7 +132,7 @@ def get_hutang_by_karyawan(id_karyawan, status_hutang=None):
         with engine.connect() as conn:
             base_query = """
                 SELECT 
-                    h.id_hutang, h.id_karyawan, k.nama, h.nominal, h.keterangan, 
+                    h.id_hutang, h.id_karyawan, k.nama, k.nama_panggilan, h.nominal, h.keterangan, 
                     h.status_hutang, h.created_at, h.updated_at
                 FROM hutang h
                 JOIN karyawan k ON k.id_karyawan = h.id_karyawan
