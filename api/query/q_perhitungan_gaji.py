@@ -172,6 +172,7 @@ def get_rekap_gaji(start_date: date = None, end_date: date = None, tanggal: date
                 if tipe_id == 1:  # Pegawai Tetap
                     gaji_perhari = gaji_pokok / hari_optimal if hari_optimal else 0
                     jumlah_hari_dibayar = min(hadir + izin + sakit, hari_optimal)
+                    jumlah_hari_dipotong = hari_optimal - min(hadir + izin + sakit, hari_optimal)
                 else:  # Pegawai Tidak Tetap
                     gaji_perhari = gaji_pokok
                     jumlah_hari_dibayar = hadir
@@ -183,6 +184,7 @@ def get_rekap_gaji(start_date: date = None, end_date: date = None, tanggal: date
 
                 terlambat = row['total_jam_terlambat'] or 0
                 jam_kurang = row['total_jam_kurang'] or 0
+                potongan_ketidakhadiran = round(gaji_perhari * jumlah_hari_dipotong)
                 total_potongan = round(gaji_permenit * (terlambat + jam_kurang))
 
                 lembur_data = lembur_map.get(id_karyawan, {})
@@ -229,6 +231,7 @@ def get_rekap_gaji(start_date: date = None, end_date: date = None, tanggal: date
                     'jam_kurang': jam_kurang,
                     'gaji_pokok': round(gaji_pokok),
                     'potongan': total_potongan,
+                    'potongan_ketidakhadiran': potongan_ketidakhadiran,
                     'tunjangan_kehadiran': tunjangan_kehadiran,
                     'kasbon': kasbon,
                     'total_lembur': total_lembur,
