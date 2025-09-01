@@ -225,6 +225,7 @@ def get_rekap_gaji(start_date: date = None, end_date: date = None, tanggal: date
                     'jumlah_izin': izin,
                     'jumlah_sakit': sakit,
                     'jumlah_alpha': max(0, hari_optimal - (sisa_hari_kerja + hadir + izin + sakit)),
+                    'hari_optimal': hari_optimal,
                     'total_jam_kerja': total_jam_kerja,
                     'jam_normal': hari_optimal * 480,
                     'jam_terlambat': terlambat,
