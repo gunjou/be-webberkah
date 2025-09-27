@@ -168,6 +168,7 @@ def get_rekap_gaji(start_date: date = None, end_date: date = None, tanggal: date
                 hadir = row['jumlah_hadir'] or 0
                 izin = row['jumlah_izin'] or 0
                 sakit = row['jumlah_sakit'] or 0
+                jumlah_hari_dipotong = 0
 
                 if tipe_id == 1:  # Pegawai Tetap
                     gaji_perhari = gaji_pokok / hari_optimal if hari_optimal else 0
