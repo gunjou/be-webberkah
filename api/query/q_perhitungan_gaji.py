@@ -88,6 +88,7 @@ def get_rekap_gaji(start_date: date = None, end_date: date = None, tanggal: date
                     SUM(a.total_jam_kerja) AS total_jam_kerja,
                     COUNT(sp.nama_status) FILTER (WHERE sp.nama_status = 'Hadir') AS jumlah_hadir,
                     COUNT(sp.nama_status) FILTER (WHERE sp.nama_status = 'Izin') AS jumlah_izin,
+                    COUNT(sp.nama_status) FILTER (WHERE sp.nama_status = 'Izin (-cuti)') AS jumlah_izin_cuti,
                     COUNT(sp.nama_status) FILTER (WHERE sp.nama_status = 'Sakit') AS jumlah_sakit
                 FROM absensi a
                 JOIN karyawan k ON a.id_karyawan = k.id_karyawan
@@ -166,7 +167,7 @@ def get_rekap_gaji(start_date: date = None, end_date: date = None, tanggal: date
                 tipe_id = row['id_tipe']
 
                 hadir = row['jumlah_hadir'] or 0
-                izin = row['jumlah_izin'] or 0
+                izin = row['jumlah_izin'] + row['jumlah_izin_cuti'] or 0
                 sakit = row['jumlah_sakit'] or 0
                 jumlah_hari_dipotong = 0
 

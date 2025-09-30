@@ -182,9 +182,8 @@ def get_hutang_by_karyawan(id_karyawan, status_hutang=None):
             terbayar_query = """
                 SELECT COALESCE(SUM(ph.nominal), 0) AS hutang_terbayarkan
                 FROM pembayaran_hutang ph
-                JOIN hutang h ON ph.id_hutang = h.id_hutang
+                JOIN hutang h ON ph.id_hutang = h.id_hutang AND ph.status = 1
                 WHERE h.id_karyawan = :id_karyawan
-                  AND ph.status = 1
                   AND h.status = 1
             """
             if status_hutang in ["lunas", "belum lunas"]:
@@ -205,7 +204,7 @@ def get_hutang_by_karyawan(id_karyawan, status_hutang=None):
         print(f"[ERROR] get_hutang_by_karyawan: {e}")
         return None
     
-def create_pembayaran_hutang_by_karyawan(id_karyawan, nominal, metode, keterangan, id_hutang=None):
+def create_pembayaran_hutang_by_karyawan(id_karyawan, nominal, metode, keterangan, id_hutang=None, tanggal=None):
     engine = get_connection()
     try:
         with engine.begin() as conn:
@@ -281,7 +280,7 @@ def create_pembayaran_hutang_by_karyawan(id_karyawan, nominal, metode, keteranga
                     "nominal": item["nominal"],
                     "metode": item["metode"],
                     "keterangan": item["keterangan"],
-                    "tanggal": get_wita().date(),
+                    "tanggal": tanggal,
                     "timestamp_wita": get_wita()
                 }
                 conn.execute(insert_query, params)
@@ -317,11 +316,9 @@ def get_pembayaran_hutang(bulan=None, id_karyawan=None, id_hutang=None, metode=N
             """
             params = {}
 
-            # Default filter ke bulan ini
-            if not bulan:
-                bulan = datetime.now().strftime("%Y-%m")
-            base_query += " AND TO_CHAR(p.tanggal, 'YYYY-MM') = :bulan"
-            params["bulan"] = bulan
+            if bulan:
+                base_query += " AND TO_CHAR(p.tanggal, 'YYYY-MM') = :bulan"
+                params["bulan"] = bulan
 
             if id_karyawan:
                 base_query += " AND h.id_karyawan = :id_karyawan"

@@ -44,6 +44,7 @@ def get_rekap_absensi(start_date, end_date, libur_nasional):
                     COUNT(sp.nama_status) FILTER (WHERE sp.nama_status = 'Tidak Hadir') AS jumlah_alpha,
                     COUNT(sp.nama_status) FILTER (WHERE sp.nama_status = 'Setengah Hari') AS jumlah_setengah_hari,
                     COUNT(sp.nama_status) FILTER (WHERE sp.nama_status = 'Izin') AS jumlah_izin,
+                    COUNT(sp.nama_status) FILTER (WHERE sp.nama_status = 'Izin (-cuti)') AS jumlah_izin_cuti,
                     COUNT(sp.nama_status) FILTER (WHERE sp.nama_status = 'Sakit') AS jumlah_sakit,
                     COUNT(sp.nama_status) FILTER (WHERE sp.nama_status = 'Dinas Luar') AS dinas_luar
                 FROM absensi a

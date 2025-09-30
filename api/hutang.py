@@ -25,7 +25,7 @@ pembayaran_hutang_parser.add_argument('nominal', type=int, required=True, locati
 pembayaran_hutang_parser.add_argument('metode', type=str, required=True, location='form', help='Metode pembayaran')
 pembayaran_hutang_parser.add_argument('keterangan', type=str, required=False, location='form', help='Keterangan')
 pembayaran_hutang_parser.add_argument('id_hutang', type=int, required=False, location='form', help='Opsional untuk pembayaran tunai')
-
+pembayaran_hutang_parser.add_argument('bulan', type=str, required=False, location='form', help='Bulan pembayaran (contoh: Januari, Februari)')
 
 @hutang_ns.route("/")
 class HutangListAdmin(Resource):
@@ -159,9 +159,31 @@ class PembayaranHutangResource(Resource):
         metode = args.get('metode')
         keterangan = args.get('keterangan') or ''
         id_hutang = args.get('id_hutang')
+        bulan = args.get('bulan')
 
         if nominal <= 0:
             return {"message": "Nominal harus lebih dari 0"}, 400
+        
+        # Tentukan tanggal pembayaran
+        if bulan:
+            try:
+                import calendar, datetime
+                # mapping nama bulan ke nomor
+                bulan_map = {
+                    "januari": 1, "februari": 2, "maret": 3,
+                    "april": 4, "mei": 5, "juni": 6,
+                    "juli": 7, "agustus": 8, "september": 9,
+                    "oktober": 10, "november": 11, "desember": 12
+                }
+                month_num = bulan_map[bulan.lower()]
+                year = get_wita().year  # bisa juga dikirim dari FE kalau perlu
+                last_day = calendar.monthrange(year, month_num)[1]  # tanggal terakhir bulan itu
+                tanggal = datetime.date(year, month_num, last_day)
+            except Exception:
+                return {"message": f"Bulan '{bulan}' tidak valid"}, 400
+        else:
+            tanggal = get_wita().date()
+        print(bulan, tanggal)
 
         try:
             result, status = create_pembayaran_hutang_by_karyawan(
@@ -169,7 +191,8 @@ class PembayaranHutangResource(Resource):
                 nominal=nominal,
                 metode=metode,
                 keterangan=keterangan,
-                id_hutang=id_hutang
+                id_hutang=id_hutang,
+                tanggal=tanggal
             )
             return result, status
         except Exception as e:

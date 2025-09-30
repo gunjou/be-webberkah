@@ -58,9 +58,11 @@ class RekapAbsensi(Resource):
                 row.get('jumlah_hadir', 0) +
                 row.get('jumlah_sakit', 0) +
                 row.get('jumlah_izin', 0) +
+                row.get('jumlah_izin_cuti', 0) +
                 row.get('jumlah_setengah_hari', 0) +
                 row.get('dinas_luar', 0)
             )
+            row['jumlah_izin'] = max(row.get('jumlah_izin', 0) + row.get('jumlah_izin_cuti', 0), 0) # gabungkan izin dan cuti
             jumlah_alpha = hari_valid - jumlah_status_valid
             row['jumlah_alpha'] = max(jumlah_alpha, 0)
 
