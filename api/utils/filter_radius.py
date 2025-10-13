@@ -27,7 +27,7 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     return R * c
 
 def get_valid_office_name(user_lat, user_lon, id_karyawan):
-    if id_karyawan not in (4, 5, 11, 40):  # selain 4 mirfat, 5 wiwin, 11 muliyadi, dan 40 nauval
+    if id_karyawan not in (4, 5, 11, 40, 9, 21):  # selain 4 mirfat, 5 wiwin, 11 muliyadi, dan 40 nauval, 9 abdul, 21 nizar
         for office in FIELD_LOCATIONS:
             distance = calculate_distance(user_lat, user_lon, office["lat"], office["lon"])
             allowed_radius = office.get("radius", 50)  # fallback default radius 50
