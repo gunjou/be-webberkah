@@ -3,16 +3,18 @@ from math import radians, sin, cos, sqrt, atan2
 # Daftar lokasi kantor dengan radius masing-masing
 OFFICE_LOCATIONS = [
     {"name": "Kantor Perampuan", "lat": -8.639211414577346, "lon": 116.08763439302037, "radius": 50},
-    {"name": "Gudang GM", "lat": -8.674641, "lon": 116.086079, "radius": 50},
+    {"name": "Gudang GM", "lat": -8.674594, "lon": 116.086204, "radius": 50},
     {"name": "PLTG Jeranjang", "lat": -8.659610, "lon": 116.074014, "radius": 100},  # radius lebih besar
-    {"name": "UPK Ampenan", "lat": -8.599413, "lon": 116.074805, "radius": 100}  # radius lebih besar
+    {"name": "UPK Ampenan", "lat": -8.599413, "lon": 116.074805, "radius": 100},  # radius lebih besar
+    {"name": "Lombok Peaker", "lat": -8.589523, "lon": 116.075144, "radius": 100}  # radius lebih besar
     # {"name": "Rumah", "lat": -8.639975671029253, "lon": 116.0940286392315, "radius": 50},
 ]
 
 FIELD_LOCATIONS = [
-    {"name": "Gudang GM", "lat": -8.674641, "lon": 116.086079, "radius": 50},
+    {"name": "Gudang GM", "lat": -8.674594, "lon": 116.086204, "radius": 50},
     {"name": "PLTG Jeranjang", "lat": -8.659610, "lon": 116.074014, "radius": 100},  # radius lebih besar
-    {"name": "UPK Ampenan", "lat": -8.599413, "lon": 116.074805, "radius": 100}  # radius lebih besar
+    {"name": "UPK Ampenan", "lat": -8.599413, "lon": 116.074805, "radius": 100},  # radius lebih besar
+    {"name": "Lombok Peaker", "lat": -8.589523, "lon": 116.075144, "radius": 100}  # radius lebih besar
 ]
 
 def calculate_distance(lat1, lon1, lat2, lon2):
