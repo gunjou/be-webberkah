@@ -3,7 +3,7 @@ from math import radians, sin, cos, sqrt, atan2
 # Daftar lokasi kantor dengan radius masing-masing
 OFFICE_LOCATIONS = [
     {"name": "Kantor Perampuan", "lat": -8.639211414577346, "lon": 116.08763439302037, "radius": 50},
-    {"name": "Gudang GM", "lat": -8.674594, "lon": 116.086204, "radius": 50},
+    {"name": "Gudang GM", "lat": -8.674594, "lon": 116.086204, "radius": 15},
     {"name": "PLTG Jeranjang", "lat": -8.659610, "lon": 116.074014, "radius": 100},  # radius lebih besar
     {"name": "UPK Ampenan", "lat": -8.599413, "lon": 116.074805, "radius": 100},  # radius lebih besar
     {"name": "Lombok Peaker", "lat": -8.589523, "lon": 116.075144, "radius": 100}  # radius lebih besar
@@ -11,7 +11,7 @@ OFFICE_LOCATIONS = [
 ]
 
 FIELD_LOCATIONS = [
-    {"name": "Gudang GM", "lat": -8.674594, "lon": 116.086204, "radius": 50},
+    {"name": "Gudang GM", "lat": -8.674594, "lon": 116.086204, "radius": 15},
     {"name": "PLTG Jeranjang", "lat": -8.659610, "lon": 116.074014, "radius": 100},  # radius lebih besar
     {"name": "UPK Ampenan", "lat": -8.599413, "lon": 116.074805, "radius": 100},  # radius lebih besar
     {"name": "Lombok Peaker", "lat": -8.589523, "lon": 116.075144, "radius": 100}  # radius lebih besar
