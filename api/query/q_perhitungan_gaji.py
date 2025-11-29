@@ -194,7 +194,8 @@ def get_rekap_gaji(start_date: date = None, end_date: date = None, tanggal: date
                 total_menit_lembur = lembur_data.get('total_menit') or 0
                 total_bayaran_lembur = lembur_data.get('total_bayaran') or 0.0
 
-                tunjangan_kehadiran = (tunjangan_map.get(id_karyawan) or 0) * 10000
+                # tunjangan_kehadiran = (tunjangan_map.get(id_karyawan) or 0) * 10000 # tunjangan kehadiran hapus temp
+                tunjangan_kehadiran = (tunjangan_map.get(id_karyawan) or 0) * 0
 
                 kasbon = kasbon_map.get(id_karyawan, 0) or 0
 
@@ -296,7 +297,8 @@ def get_gaji_harian(tanggal: date, id_karyawan: int):
             # Tunjangan kehadiran jika masuk sebelum 07:46
             tunjangan_kehadiran = 0
             if result['jam_masuk'] and result['jam_masuk'] < time(7, 46):
-                tunjangan_kehadiran = 10000
+                # tunjangan_kehadiran = 10000 # tunjangan dihapus sementara
+                tunjangan_kehadiran = 0
 
             # Upah bersih jika sudah check out (total jam kerja > 0)
             upah_bersih = None
