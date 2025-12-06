@@ -16,6 +16,7 @@ from .rekapan import rekapan_ns
 from .perhitungan_gaji import perhitungan_gaji_ns
 from .pembayaran_gaji import pembayaran_gaji_ns
 from .izin_sakit import izin_ns
+from .perizinan import perizinan_ns
 from .cuti import cuti_ns
 from .lembur import lembur_ns
 from .libur import libur_ns
@@ -87,6 +88,7 @@ restx_api.add_namespace(rekapan_ns, path="/rekapan")
 restx_api.add_namespace(perhitungan_gaji_ns, path="/perhitungan-gaji")
 restx_api.add_namespace(pembayaran_gaji_ns, path="/pembayaran-gaji")
 restx_api.add_namespace(izin_ns, path="/perizinan")
+restx_api.add_namespace(perizinan_ns, path="/perizinan-new")
 restx_api.add_namespace(cuti_ns, path="/cuti")
 restx_api.add_namespace(lembur_ns, path="/lembur")
 restx_api.add_namespace(libur_ns, path="/libur")

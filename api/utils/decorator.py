@@ -10,7 +10,7 @@ def role_required(expected_role):
             jwt_data = get_jwt()
             role = jwt_data.get("role")  # akses role dari claims
             if role != expected_role:
-                return jsonify({"status": "Forbidden"}), 403
+                return {"status": False, "message": "Akses ditolak"}, 403
             return fn(*args, **kwargs)
         return decorator
     return wrapper
