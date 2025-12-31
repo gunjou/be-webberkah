@@ -112,6 +112,16 @@ def decimal_to_float(row):
         key: float(value) if isinstance(value, Decimal) else value
         for key, value in row.items()
     }
+    
+def clean_decimal(obj):
+    if isinstance(obj, dict):
+        return {k: clean_decimal(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [clean_decimal(v) for v in obj]
+    elif isinstance(obj, Decimal):
+        return float(obj)
+    else:
+        return obj
 
 def serialize_time(obj):
     """Mengubah objek time ke string, dan juga mengubah float Decimal."""
@@ -120,3 +130,6 @@ def serialize_time(obj):
     elif isinstance(obj, Decimal):
         return float(obj)
     return obj
+
+def safe_num(val):
+    return float(val) if val is not None else 0.0

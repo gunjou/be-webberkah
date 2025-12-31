@@ -22,6 +22,8 @@ from .lembur import lembur_ns
 from .libur import libur_ns
 from .leaderboard import leaderboard_ns
 from .hutang import hutang_ns
+from .potongan import potongan_ns
+from .payroll import payroll_ns
 # from .testdb import testdb_ns
 
 from .utils.blacklist_store import is_blacklisted
@@ -94,4 +96,6 @@ restx_api.add_namespace(lembur_ns, path="/lembur")
 restx_api.add_namespace(libur_ns, path="/libur")
 restx_api.add_namespace(leaderboard_ns, path="/peringkat")
 restx_api.add_namespace(hutang_ns, path="/hutang")
+restx_api.add_namespace(potongan_ns, path="/potongan")
+restx_api.add_namespace(payroll_ns, path="/payroll")
 # restx_api.add_namespace(testdb_ns, path="/test-db")
