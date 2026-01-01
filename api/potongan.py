@@ -45,6 +45,7 @@ class PreviewPotonganHarianResource(Resource):
             "total_izin": hasil["total_izin"],
             "total_sakit": hasil["total_sakit"],
             "total_potongan": hasil["total_potongan"],
+            "ringkasan_potongan": hasil["ringkasan_potongan"],
             "data": hasil["data"]
         }, 200
 
@@ -77,7 +78,8 @@ class PreviewPotonganBulananResource(Resource):
             jenis_pegawai=harian["jenis_pegawai"],
             total_alpha=harian["total_alpha"],
             total_izin=harian["total_izin"],
-            total_sakit=harian["total_sakit"]
+            total_sakit=harian["total_sakit"],
+            potongan_makan_harian=harian["ringkasan_potongan"]["tunjangan_makan"]
         )
 
         if bulanan is None:

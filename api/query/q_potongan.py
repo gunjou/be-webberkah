@@ -27,8 +27,9 @@ def hitung_potongan_harian(id_karyawan, bulan, tahun):
 
             if master_harian:
                 jenis_pegawai = "harian"
-                base_makan = master_harian["tunjangan_makan_harian"]
-                base_transport = master_harian["tunjangan_transport_harian"]
+                gaji_harian = float(master_harian["gaji_harian"])
+                base_makan = float(master_harian["tunjangan_makan_harian"])
+                base_transport = float(master_harian["tunjangan_transport_harian"])
             else:
                 # Pegawai tetap / magang
                 master_bulanan = conn.execute(text("""
@@ -80,6 +81,10 @@ def hitung_potongan_harian(id_karyawan, bulan, tahun):
             total_alpha = 0
             total_izin = 0
             total_sakit = 0
+            
+            total_potong_gaji_harian = 0.0
+            total_potong_tunjangan_makan = 0.0
+            total_potong_tunjangan_transport = 0.0
 
             # =====================================================
             # 3️⃣ Loop per hari
@@ -93,13 +98,82 @@ def hitung_potongan_harian(id_karyawan, bulan, tahun):
                 }
 
                 row = next((r for r in absensi if r["tanggal"] == tanggal), None)
-                if row:
-                    jenis_izin = row["jenis_izin"].lower()
+                # if row:
+                #     jenis_izin = row["jenis_izin"].lower()
 
-                    if jenis_izin == "izin":
-                        total_izin += 1
-                    elif jenis_izin == "sakit":
-                        total_sakit += 1
+                #     if jenis_izin == "izin":
+                #         total_izin += 1
+                #     elif jenis_izin == "sakit":
+                #         total_sakit += 1
+
+                # =========================================
+                # KHUSUS PEGAWAI HARIAN:
+                # IZIN / SAKIT / ALPHA = TIDAK DIBAYAR
+                # =========================================
+
+                if jenis_pegawai == "harian":
+
+                    # Status ALPHA (tidak ada absensi)
+                    if not row:
+                        total_alpha += 1
+
+                        total_potongan += gaji_harian + base_makan + base_transport
+
+                        total_potong_gaji_harian += gaji_harian
+                        total_potong_tunjangan_makan += base_makan
+                        total_potong_tunjangan_transport += base_transport
+
+                        potongan_hari["potongan"].append({
+                            "jenis": "alpha",
+                            "target": "gaji_harian",
+                            "nominal": round(gaji_harian, 2)
+                        })
+                        potongan_hari["potongan"].append({
+                            "jenis": "alpha",
+                            "target": "tunjangan_makan",
+                            "nominal": round(base_makan, 2)
+                        })
+                        potongan_hari["potongan"].append({
+                            "jenis": "alpha",
+                            "target": "tunjangan_transport",
+                            "nominal": round(base_transport, 2)
+                        })
+
+                        hasil.append(potongan_hari)
+                        continue  # ⛔ STOP ke hari berikutnya
+
+                    # Status IZIN / SAKIT
+                    jenis_izin = row["jenis_izin"].lower()
+                    if jenis_izin in ("izin", "sakit"):
+                        if jenis_izin == "izin":
+                            total_izin += 1
+                        else:
+                            total_sakit += 1
+
+                        total_potongan += gaji_harian + base_makan + base_transport
+
+                        total_potong_gaji_harian += gaji_harian
+                        total_potong_tunjangan_makan += base_makan
+                        total_potong_tunjangan_transport += base_transport
+
+                        potongan_hari["potongan"].append({
+                            "jenis": jenis_izin,
+                            "target": "gaji_harian",
+                            "nominal": round(gaji_harian, 2)
+                        })
+                        potongan_hari["potongan"].append({
+                            "jenis": jenis_izin,
+                            "target": "tunjangan_makan",
+                            "nominal": round(base_makan, 2)
+                        })
+                        potongan_hari["potongan"].append({
+                            "jenis": jenis_izin,
+                            "target": "tunjangan_transport",
+                            "nominal": round(base_transport, 2)
+                        })
+
+                        hasil.append(potongan_hari)
+                        continue  # ⛔ STOP ke hari berikutnya
 
                 # =====================================================
                 # KASUS 1: ADA ABSENSI
@@ -134,6 +208,7 @@ def hitung_potongan_harian(id_karyawan, bulan, tahun):
                             )
 
                             nominal = base_harian * float(rule["potong_persen"]) / 100
+                            total_potong_tunjangan_transport += round(nominal, 2)
                             total_potongan += round(nominal, 2)
 
                             potongan_hari["potongan"].append({
@@ -203,6 +278,11 @@ def hitung_potongan_harian(id_karyawan, bulan, tahun):
                         nominal = base_harian * float(r["potong_persen"]) / 100
                         total_potongan += round(nominal, 2)
 
+                        if r["target_potongan"] == "tunjangan_makan":
+                            total_potong_tunjangan_makan += round(nominal, 2)
+                        elif r["target_potongan"] == "tunjangan_transport":
+                            total_potong_tunjangan_transport += round(nominal, 2)
+
                         potongan_hari["potongan"].append({
                             "jenis": "alpha",
                             "target": r["target_potongan"],
@@ -221,6 +301,11 @@ def hitung_potongan_harian(id_karyawan, bulan, tahun):
                 "total_izin": total_izin,
                 "total_sakit": total_sakit,
                 "total_potongan": round(total_potongan, 2),
+                "ringkasan_potongan": {
+                    "gaji_harian": round(total_potong_gaji_harian, 2) if jenis_pegawai == "harian" else 0,
+                    "tunjangan_makan": round(total_potong_tunjangan_makan, 2),
+                    "tunjangan_transport": round(total_potong_tunjangan_transport, 2)
+                },
                 "data": hasil
             }
 
@@ -236,7 +321,8 @@ def hitung_potongan_bulanan(
     jenis_pegawai,
     total_alpha,
     total_izin,
-    total_sakit
+    total_sakit,
+    potongan_makan_harian
 ):
     engine = get_connection()
     hari_kerja = get_hari_kerja_efektif_bulanan(tahun, bulan)
@@ -321,14 +407,21 @@ def hitung_potongan_bulanan(
                 }
 
             persen = float(rule["potong_persen"])
-            nominal = tunjangan_makan_bulanan * persen / 100
+            sisa_tunjangan_makan = max(
+                    tunjangan_makan_bulanan - float(potongan_makan_harian),
+                    0
+                )
+            nominal = sisa_tunjangan_makan * persen / 100
+            # ⛔ SAFETY CAP: tidak boleh melebihi sisa
+            nominal = min(nominal, sisa_tunjangan_makan)
 
             return {
                 "jenis": jenis_rule,
                 "jumlah": jumlah,
                 "persen": persen,
                 "nominal": round(nominal, 2),
-                "target": "tunjangan_makan"
+                "target": "tunjangan_makan",
+                # "basis": round(sisa_tunjangan_makan, 2)
             }
 
     except Exception as e:
