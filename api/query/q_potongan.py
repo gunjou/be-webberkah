@@ -243,6 +243,11 @@ def hitung_potongan_harian(id_karyawan, bulan, tahun):
 
                             nominal = base_harian * float(r["potong_persen"]) / 100
                             total_potongan += round(nominal, 2)
+                            
+                            if r["target_potongan"] == "tunjangan_makan":
+                                total_potong_tunjangan_makan += nominal
+                            elif r["target_potongan"] == "tunjangan_transport":
+                                total_potong_tunjangan_transport += nominal
 
                             potongan_hari["potongan"].append({
                                 "jenis": jenis_izin,
