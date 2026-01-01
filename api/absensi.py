@@ -261,6 +261,7 @@ class AbsensiIstirahatMulaiResource(Resource):
             # ⛔ Validasi waktu minimal 11.30
             batas_mulai = time(11, 30)
             batas_selesai = time(14, 00)
+            # batas_selesai = time(21, 30)
             allowed = batas_mulai <= jam_sekarang <= batas_selesai
             if not allowed:
                 return {
@@ -497,7 +498,7 @@ class AbsensiHarianPersonalResource(Resource):
 class CekPresensiResource(Resource):
     @role_required('karyawan')
     def get(self, id_karyawan):
-        """Akses: (karyawan), Check presensi karyawan berdasarkan id"""
+        """Akses: (karyawan), Check presensi & istirahat hari ini"""
         cek_presensi = get_check_presensi(id_karyawan)
 
         if not cek_presensi:
@@ -506,14 +507,37 @@ class CekPresensiResource(Resource):
         result = {
             "id_absensi": cek_presensi["id_absensi"],
             "tanggal": cek_presensi["tanggal"].strftime('%d-%m-%Y'),
-            "jam_masuk": cek_presensi["jam_masuk"].strftime('%H:%M') if cek_presensi["jam_masuk"] else None,
-            "jam_keluar": cek_presensi["jam_keluar"].strftime('%H:%M') if cek_presensi["jam_keluar"] else None,
+            "jam_masuk": (
+                cek_presensi["jam_masuk"].strftime('%H:%M')
+                if cek_presensi["jam_masuk"] else None
+            ),
+            "jam_keluar": (
+                cek_presensi["jam_keluar"].strftime('%H:%M')
+                if cek_presensi["jam_keluar"] else None
+            ),
             "lokasi_masuk": cek_presensi["lokasi_masuk"],
             "lokasi_keluar": cek_presensi["lokasi_keluar"],
-            "jam_terlambat": cek_presensi["jam_terlambat"]
+            "jam_terlambat": cek_presensi["jam_terlambat"],
+
+            # ⬇️ DATA ISTIRAHAT
+            "istirahat": {
+                "sudah_mulai": cek_presensi["istirahat_mulai"] is not None,
+                "sudah_selesai": cek_presensi["istirahat_selesai_real"] is not None,
+                "jam_mulai": (
+                    cek_presensi["istirahat_mulai"].strftime('%H:%M')
+                    if cek_presensi["istirahat_mulai"] else None
+                ),
+                "jam_selesai": (
+                    cek_presensi["istirahat_selesai_real"].strftime('%H:%M')
+                    if cek_presensi["istirahat_selesai_real"] else None
+                ),
+                "menit_telat": cek_presensi["menit_telat_istirahat"] or 0,
+                "menit_lebih": cek_presensi["menit_lebih_istirahat"] or 0
+            }
         }
 
         return result, 200
+
     
 
 @absensi_ns.route('/hadir')

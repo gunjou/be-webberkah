@@ -264,25 +264,43 @@ def delete_checkout(id_absensi):
 
 def get_check_presensi(id_karyawan):
     engine = get_connection()
-    today, _ = get_timezone()  # Mendapatkan tanggal hari ini
-    # print(today)
+    today, _ = get_timezone()
+
     try:
         with engine.connect() as connection:
             result = connection.execute(
                 text("""
-                    SELECT id_absensi, tanggal, jam_masuk, jam_keluar, lokasi_masuk, lokasi_keluar, jam_terlambat
-                    FROM Absensi 
-                    WHERE id_karyawan = :id_karyawan
-                    AND tanggal = :today
-                    AND status = 1
-                    ORDER BY jam_masuk DESC
+                    SELECT
+                        a.id_absensi,
+                        a.tanggal,
+                        a.jam_masuk,
+                        a.jam_keluar,
+                        a.lokasi_masuk,
+                        a.lokasi_keluar,
+                        a.jam_terlambat,
+
+                        ai.istirahat_mulai,
+                        ai.istirahat_selesai_real,
+                        ai.menit_telat_istirahat,
+                        ai.menit_lebih_istirahat
+
+                    FROM absensi a
+                    LEFT JOIN absensi_istirahat ai
+                        ON ai.id_absensi = a.id_absensi
+                       AND ai.status = 1
+
+                    WHERE a.id_karyawan = :id_karyawan
+                      AND a.tanggal = :today
+                      AND a.status = 1
+
+                    ORDER BY a.jam_masuk DESC
                     LIMIT 1;
                 """),
                 {
                     "id_karyawan": id_karyawan,
                     "today": today
                 }
-            ).mappings().fetchone()  # Mengambil satu record sebagai dictionary
+            ).mappings().fetchone()
 
             if result is None:
                 return None
@@ -290,8 +308,9 @@ def get_check_presensi(id_karyawan):
             return dict(result)
 
     except SQLAlchemyError as e:
-        print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
-        return None  # Mengembalikan None jika terjadi kesalahan
+        print(f"Error occurred: {str(e)}")
+        return None
+
     
 def add_istirahat_mulai(id_absensi, id_karyawan, jam_mulai):
     engine = get_connection()
