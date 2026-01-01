@@ -1,8 +1,8 @@
-from datetime import datetime
+from datetime import datetime, time
 import re
 import logging
 from flask import request
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_restx import Namespace, Resource, fields
 from werkzeug.datastructures import FileStorage
 from sqlalchemy.exc import SQLAlchemyError
@@ -38,7 +38,14 @@ add_absensi_model = absensi_ns.model('AddAbsensi', {
     'lokasi_keluar': fields.String(required=False, description='Nama lokasi keluar (dipilih dari dropdown)'),
 })
 
+istirahat_selesai_parser = absensi_ns.parser()
+istirahat_selesai_parser.add_argument('file', location='files', type=FileStorage, required=True, help='Foto wajah saat selesai istirahat')
+istirahat_selesai_parser.add_argument('latitude', type=str, required=True, help='Latitude lokasi')
+istirahat_selesai_parser.add_argument('longitude', type=str, required=True, help='Longitude lokasi')
 
+# =============================
+# ABSENSI ENDPOINTS
+# =============================
 @absensi_ns.route('/add/<int:id_karyawan>')
 class AddAbsensiResource(Resource):
     @role_required('admin')
@@ -215,6 +222,242 @@ class AbsensiCheckOutResource(Resource):
                 return {'status': "Internal server error"}, 500
 
 
+# =============================
+# ABSENSI ISTIRAHAT ENDPOINTS
+# =============================
+@absensi_ns.route('/istirahat/mulai')
+class AbsensiIstirahatMulaiResource(Resource):
+    @jwt_required()
+    @role_required('karyawan')
+    @absensi_ns.response(200, 'Berhasil memulai istirahat')
+    @absensi_ns.response(400, 'Validasi gagal')
+    @absensi_ns.response(403, 'Tidak diizinkan')
+    def post(self):
+        """
+        Akses: (karyawan)
+        Mulai istirahat kerja (tanpa foto & lokasi)
+        """
+        try:
+            id_karyawan = get_jwt_identity()
+            tanggal, jam_sekarang = get_timezone()
+            
+            # 🔍 Ambil absensi hari ini
+            absensi = get_absensi_hari_ini(id_karyawan, tanggal)
+            if not absensi:
+                return {
+                    "status": "error",
+                    "message": "Anda belum melakukan check-in hari ini"
+                }, 400
+                
+            id_absensi = absensi[0]
+            
+            # ⛔ Sudah mulai istirahat?
+            if is_istirahat_sudah_mulai(id_absensi):
+                return {
+                    "status": "error",
+                    "message": "Istirahat sudah dimulai sebelumnya"
+                }, 400
+
+            # ⛔ Validasi waktu minimal 11.30
+            batas_mulai = time(11, 30)
+            batas_selesai = time(14, 00)
+            allowed = batas_mulai <= jam_sekarang <= batas_selesai
+            if not allowed:
+                return {
+                    "status": "error",
+                    "message": "Istirahat hanya bisa dimulai dari 11.30 WITA sampai 14.00 WITA"
+                }, 400
+
+            # ⛔ Sudah checkout?
+            if is_checkout_done(id_absensi):
+                return {
+                    "status": "error",
+                    "message": "Anda sudah melakukan check-out"
+                }, 400
+
+            # ✅ Simpan mulai istirahat
+            success = add_istirahat_mulai(
+                id_absensi=id_absensi,
+                id_karyawan=id_karyawan,
+                jam_mulai=jam_sekarang
+            )
+
+            if not success:
+                return {
+                    "status": "error",
+                    "message": "Gagal menyimpan data istirahat"
+                }, 500
+
+            return {
+                "status": "success",
+                "message": "Istirahat berhasil dimulai",
+                "jam_mulai": jam_sekarang.strftime("%H:%M")
+            }, 200
+
+        except SQLAlchemyError as e:
+            return {
+                "status": "error",
+                "message": "Internal server error"
+            }, 500
+            
+
+@absensi_ns.route('/istirahat/selesai')
+class AbsensiIstirahatSelesaiResource(Resource):
+    @jwt_required()
+    @role_required('karyawan')
+    @absensi_ns.expect(istirahat_selesai_parser)
+    @absensi_ns.response(200, 'Istirahat berhasil diselesaikan')
+    @absensi_ns.response(400, 'Validasi gagal')
+    @absensi_ns.response(403, 'Tidak diizinkan')
+    def put(self):
+        """
+        Akses: (karyawan)
+        Menyelesaikan istirahat (validasi wajah & lokasi)
+        """
+        try:
+            id_karyawan = get_jwt_identity()
+            args = istirahat_selesai_parser.parse_args()
+
+            image = args['file']
+            user_lat = float(args['latitude'])
+            user_lon = float(args['longitude'])
+
+            if image.filename == '':
+                return {"message": "Foto wajah wajib diisi"}, 400
+
+            tanggal, jam_sekarang = get_timezone()
+
+            # 🔍 Ambil absensi hari ini
+            absensi = get_absensi_hari_ini(id_karyawan, tanggal)
+            if not absensi:
+                return {"message": "Anda belum check-in hari ini"}, 400
+
+            id_absensi = absensi[0]
+
+            # ⛔ Sudah checkout?
+            if is_checkout_done(id_absensi):
+                return {"message": "Anda sudah check-out"}, 400
+
+            # 🔍 Ambil istirahat aktif
+            istirahat = get_istirahat_aktif(id_absensi)
+            if not istirahat:
+                return {"message": "Tidak ada istirahat aktif"}, 400
+
+            id_istirahat, jam_mulai = istirahat
+
+            # 📍 Validasi lokasi
+            lokasi = get_valid_office_name(user_lat, user_lon, id_karyawan)
+            if lokasi is None:
+                return {"message": "Anda berada di luar lokasi kerja"}, 403
+
+            # 🧠 Validasi wajah
+            face = verifikasi_wajah(id_karyawan, image)
+            if face == "not_detected":
+                return {"message": "Wajah tidak terdeteksi"}, 400
+            elif face == "error":
+                return {"message": "Gagal memverifikasi wajah"}, 500
+            elif not face:
+                return {"message": "Wajah tidak cocok"}, 403
+
+            # ⏱️ HITUNG TELAT / LEBIH
+            batas_siap_kerja = time(14, 0)
+
+            menit_telat = 0
+            menit_lebih = 0
+
+            if jam_sekarang > batas_siap_kerja:
+                delta = (
+                    datetime.combine(tanggal, jam_sekarang)
+                    - datetime.combine(tanggal, batas_siap_kerja)
+                )
+                menit_telat = int(delta.total_seconds() / 60)
+            elif jam_sekarang < batas_siap_kerja:
+                delta = (
+                    datetime.combine(tanggal, batas_siap_kerja)
+                    - datetime.combine(tanggal, jam_sekarang)
+                )
+                menit_lebih = int(delta.total_seconds() / 60)
+
+            # 💾 Update DB
+            success = update_istirahat_selesai(
+                id_istirahat=id_istirahat,
+                jam_selesai=jam_sekarang,
+                menit_telat=menit_telat,
+                menit_lebih=menit_lebih,
+                lokasi_kembali=lokasi
+            )
+
+            if not success:
+                return {"message": "Gagal menyimpan data istirahat"}, 500
+
+            return {
+                "status": "success",
+                "message": "Istirahat selesai",
+                "jam_kembali": jam_sekarang.strftime("%H:%M"),
+                "menit_telat": menit_telat,
+                "menit_lebih": menit_lebih
+            }, 200
+
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": "Internal server error"
+            }, 500
+            
+            
+@absensi_ns.route('/status')
+class AbsensiIstirahatStatusResource(Resource):
+    @jwt_required()
+    @role_required('karyawan')
+    @absensi_ns.response(200, 'Status istirahat')
+    def get(self):
+        """
+        Akses: (karyawan)
+        Mengambil status istirahat hari ini (untuk frontend)
+        """
+        id_karyawan = get_jwt_identity()
+        tanggal, _ = get_timezone()
+
+        result = get_status_istirahat(id_karyawan, tanggal)
+
+        # ❌ Belum check-in sama sekali
+        if not result:
+            return {
+                "sudah_checkin": False,
+                "sudah_checkout": False,
+                "istirahat": {
+                    "sudah_mulai": False,
+                    "sudah_selesai": False,
+                    "jam_mulai": None,
+                    "jam_selesai": None
+                }
+            }, 200
+
+        (
+            id_absensi,
+            jam_keluar,
+            istirahat_mulai,
+            istirahat_selesai
+        ) = result
+
+        return {
+            "sudah_checkin": True,
+            "sudah_checkout": jam_keluar is not None,
+            "istirahat": {
+                "sudah_mulai": istirahat_mulai is not None,
+                "sudah_selesai": istirahat_selesai is not None,
+                "jam_mulai": (
+                    istirahat_mulai.strftime("%H:%M")
+                    if istirahat_mulai else None
+                ),
+                "jam_selesai": (
+                    istirahat_selesai.strftime("%H:%M")
+                    if istirahat_selesai else None
+                )
+            }
+        }, 200
+        
+            
 @absensi_ns.route('/delete-check-out/<int:id_absensi>')
 class HapusJamKeluar(Resource):
     @role_required('karyawan')
@@ -248,6 +491,7 @@ class AbsensiHarianPersonalResource(Resource):
 
         result = get_history_absensi_harian(id_karyawan, tanggal_filter)
         return {'history': result}, 200
+
 
 @absensi_ns.route('/check/<int:id_karyawan>')
 class CekPresensiResource(Resource):

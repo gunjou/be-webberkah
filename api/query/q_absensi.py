@@ -4,6 +4,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from ..utils.config import get_connection, get_wita, get_timezone
 
 
+# ===== HELPER FUNCTIONS =====
 def is_wfh_allowed(id_karyawan):
     engine = get_connection()
     try:
@@ -17,6 +18,7 @@ def is_wfh_allowed(id_karyawan):
         print(f"Error checking WFH status: {str(e)}")
         return False
     
+    
 def get_jenis_karyawan(id_karyawan):
     engine = get_connection()
     with engine.connect() as connection:
@@ -25,7 +27,73 @@ def get_jenis_karyawan(id_karyawan):
             {"id_karyawan": id_karyawan}
         ).fetchone()
         return result[0] if result else None
+
+
+def get_absensi_hari_ini(id_karyawan, tanggal):
+    engine = get_connection()
+    with engine.connect() as conn:
+        return conn.execute(
+            text("""
+                SELECT id_absensi
+                FROM absensi
+                WHERE id_karyawan = :id_karyawan
+                  AND tanggal = :tanggal
+                  AND status = 1
+                LIMIT 1
+            """),
+            {
+                "id_karyawan": id_karyawan,
+                "tanggal": tanggal
+            }
+        ).fetchone()
+
+
+def is_checkout_done(id_absensi):
+    engine = get_connection()
+    with engine.connect() as conn:
+        result = conn.execute(
+            text("""
+                SELECT jam_keluar
+                FROM absensi
+                WHERE id_absensi = :id_absensi
+            """),
+            {"id_absensi": id_absensi}
+        ).fetchone()
+        return result and result[0] is not None
+
+
+def is_istirahat_sudah_mulai(id_absensi):
+    engine = get_connection()
+    with engine.connect() as conn:
+        result = conn.execute(
+            text("""
+                SELECT 1
+                FROM absensi_istirahat
+                WHERE id_absensi = :id_absensi
+                  AND status = 1
+                LIMIT 1
+            """),
+            {"id_absensi": id_absensi}
+        ).fetchone()
+        return result is not None
     
+    
+def get_istirahat_aktif(id_absensi):
+    engine = get_connection()
+    with engine.connect() as conn:
+        return conn.execute(
+            text("""
+                SELECT id_istirahat, istirahat_mulai
+                FROM absensi_istirahat
+                WHERE id_absensi = :id_absensi
+                  AND status = 1
+                  AND istirahat_selesai_real IS NULL
+                LIMIT 1
+            """),
+            {"id_absensi": id_absensi}
+        ).fetchone()
+    
+# ===== MAIN FUNCTIONS =====
 def add_checkin(id_karyawan, tanggal, jam_masuk, lokasi_absensi, jam_terlambat_input):
     engine = get_connection()
     try:
@@ -225,6 +293,97 @@ def get_check_presensi(id_karyawan):
         print(f"Error occurred: {str(e)}")  # Log kesalahan (atau gunakan logging)
         return None  # Mengembalikan None jika terjadi kesalahan
     
+def add_istirahat_mulai(id_absensi, id_karyawan, jam_mulai):
+    engine = get_connection()
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text("""
+                    INSERT INTO absensi_istirahat (
+                        id_absensi,
+                        id_karyawan,
+                        istirahat_mulai,
+                        created_at,
+                        updated_at,
+                        status
+                    ) VALUES (
+                        :id_absensi,
+                        :id_karyawan,
+                        :istirahat_mulai,
+                        :now,
+                        :now,
+                        1
+                    )
+                """),
+                {
+                    "id_absensi": id_absensi,
+                    "id_karyawan": id_karyawan,
+                    "istirahat_mulai": jam_mulai,
+                    "now": get_wita()
+                }
+            )
+            return True
+    except SQLAlchemyError as e:
+        print(f"Error add_istirahat_mulai: {str(e)}")
+        return False
+    
+    
+def update_istirahat_selesai(id_istirahat, jam_selesai, menit_telat, menit_lebih, lokasi_kembali):
+    engine = get_connection()
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text("""
+                    UPDATE absensi_istirahat
+                    SET
+                        istirahat_selesai_real = :jam_selesai,
+                        menit_telat_istirahat = :menit_telat,
+                        menit_lebih_istirahat = :menit_lebih,
+                        lokasi_kembali = :lokasi_kembali,
+                        updated_at = :now
+                    WHERE id_istirahat = :id_istirahat
+                """),
+                {
+                    "id_istirahat": id_istirahat,
+                    "jam_selesai": jam_selesai,
+                    "menit_telat": menit_telat,
+                    "menit_lebih": menit_lebih,
+                    "lokasi_kembali": lokasi_kembali,
+                    "now": get_wita()
+                }
+            )
+            return True
+    except SQLAlchemyError as e:
+        print(f"Error update_istirahat_selesai: {str(e)}")
+        return False
+    
+    
+def get_status_istirahat(id_karyawan, tanggal):
+    engine = get_connection()
+    with engine.connect() as conn:
+        return conn.execute(
+            text("""
+                SELECT
+                    a.id_absensi,
+                    a.jam_keluar,
+                    ai.istirahat_mulai,
+                    ai.istirahat_selesai_real
+                FROM absensi a
+                LEFT JOIN absensi_istirahat ai
+                    ON ai.id_absensi = a.id_absensi
+                   AND ai.status = 1
+                WHERE a.id_karyawan = :id_karyawan
+                  AND a.tanggal = :tanggal
+                  AND a.status = 1
+                LIMIT 1
+            """),
+            {
+                "id_karyawan": id_karyawan,
+                "tanggal": tanggal
+            }
+        ).fetchone()
+        
+    
 # query/absensi.py
 def get_history_absensi_harian(id_karyawan, tanggal):
     engine = get_connection()
@@ -374,7 +533,7 @@ def query_absensi_izin_sakit(tanggal, id_karyawan=None):
 
             return [{
                 "id": index + 1,
-                "id_karyawan": row["id_karyawan"],
+                "id_karyawan": row["id_karyawan"], 
                 "nama": row["nama"],
                 "nama_panggilan": row["nama_panggilan"],
                 "id_status": row["id_status"],
