@@ -98,13 +98,13 @@ def hitung_potongan_harian(id_karyawan, bulan, tahun):
                 }
 
                 row = next((r for r in absensi if r["tanggal"] == tanggal), None)
-                # if row:
-                #     jenis_izin = row["jenis_izin"].lower()
+                if row:
+                    jenis_izin = row["jenis_izin"].lower()
 
-                #     if jenis_izin == "izin":
-                #         total_izin += 1
-                #     elif jenis_izin == "sakit":
-                #         total_sakit += 1
+                    if jenis_izin == "izin":
+                        total_izin += 1
+                    elif jenis_izin == "sakit":
+                        total_sakit += 1
 
                 # =========================================
                 # KHUSUS PEGAWAI HARIAN:
